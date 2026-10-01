@@ -9,6 +9,7 @@ import {
   ClipboardCheck,
   Filter,
   Heart,
+  House,
   LockKeyhole,
   Mail,
   Menu,
@@ -30,6 +31,7 @@ import BrowsePage from './pages/Browse'
 import SellPage from './pages/Sell'
 import AdminPage from './pages/Admin'
 import VerificationPage from './pages/Verification'
+import ProductDetailPage, { toProductSlug } from './pages/ProductDetail'
 import Footer from './components/Footer'
 import './desktop.css'
 import './app-overrides.css'
@@ -40,7 +42,7 @@ const pathToPage = {
   '/sell': 'sell',
   '/admin': 'admin',
   '/varification': 'verification',
-  '/contact':'contact'
+  '/contact': 'contact'
 }
 
 const pageToPath = {
@@ -85,8 +87,18 @@ function hasActiveUserSession() {
   return true
 }
 
-function getPageFromPath() {
-  return pathToPage[window.location.pathname] || 'home'
+function getProductSlugFromPath(pathname = window.location.pathname) {
+  if (pathname.startsWith('/buy/') && pathname.length > 5) {
+    return decodeURIComponent(pathname.slice(5)).replace(/\/$/, '')
+  }
+  return ''
+}
+
+function getPageFromPath(pathname = window.location.pathname) {
+  if (pathname.startsWith('/buy/') && pathname.length > 5) {
+    return 'product-detail'
+  }
+  return pathToPage[pathname] || 'home'
 }
 
 function getStoredAdminSession() {
@@ -129,20 +141,20 @@ function App() {
 
       return draft?.data?.email
         ? {
-            step:
-              draft.step === 'otp'
-                ? 'otp'
-                : 'details',
-            data: draft.data,
-          }
+          step:
+            draft.step === 'otp'
+              ? 'otp'
+              : 'details',
+          data: draft.data,
+        }
         : {
-            step: 'details',
-            data: {
-              name: '',
-              mobileNumber: '',
-              email: '',
-            },
-          }
+          step: 'details',
+          data: {
+            name: '',
+            mobileNumber: '',
+            email: '',
+          },
+        }
     } catch {
       return {
         step: 'details',
@@ -163,6 +175,11 @@ function App() {
     useState(getStoredAdminSession)
 
   const [page, setPage] = useState(() => {
+    const slug = getProductSlugFromPath()
+    if (slug) {
+      return 'product-detail'
+    }
+
     if (
       !hasActiveUserSession() &&
       window.location.pathname !== pageToPath.admin
@@ -173,6 +190,11 @@ function App() {
     return getPageFromPath()
   })
 
+  const [productSlug, setProductSlug] = useState(() =>
+    getProductSlugFromPath()
+  )
+  const [selectedProduct, setSelectedProduct] = useState(null)
+  const [pendingPageOptions, setPendingPageOptions] = useState(null)
   const [mobileMenu, setMobileMenu] = useState(false)
   const [verificationOpen, setVerificationOpen] =
     useState(false)
@@ -294,7 +316,7 @@ function App() {
       if (
         authenticated &&
         window.location.pathname ===
-          pageToPath.verification
+        pageToPath.verification
       ) {
         window.history.replaceState(
           {},
@@ -311,11 +333,11 @@ function App() {
       if (
         !authenticated &&
         window.location.pathname !==
-          pageToPath.home &&
+        pageToPath.home &&
         window.location.pathname !==
-          pageToPath.verification &&
+        pageToPath.verification &&
         window.location.pathname !==
-          pageToPath.admin
+        pageToPath.admin
       ) {
         window.history.replaceState(
           {},
@@ -339,6 +361,12 @@ function App() {
       }
 
       setVerificationOpen(false)
+      const currentSlug = getProductSlugFromPath()
+      if (currentSlug) {
+        setProductSlug(currentSlug)
+        setPage('product-detail')
+        return
+      }
       setPage(getPageFromPath())
     }
 
@@ -353,7 +381,7 @@ function App() {
     if (
       authenticated &&
       window.location.pathname ===
-        pageToPath.verification
+      pageToPath.verification
     ) {
       window.history.replaceState(
         {},
@@ -368,11 +396,12 @@ function App() {
     if (
       !authenticated &&
       window.location.pathname !==
-        pageToPath.home &&
+      pageToPath.home &&
       window.location.pathname !==
-        pageToPath.verification &&
+      pageToPath.verification &&
       window.location.pathname !==
-        pageToPath.admin
+      pageToPath.admin &&
+      !getProductSlugFromPath(window.location.pathname)
     ) {
       window.history.replaceState(
         {},
@@ -381,8 +410,9 @@ function App() {
       )
     } else if (
       !pathToPage[
-        window.location.pathname
-      ]
+      window.location.pathname
+      ] &&
+      !getProductSlugFromPath(window.location.pathname)
     ) {
       window.history.replaceState(
         {},
@@ -394,7 +424,7 @@ function App() {
     if (
       !authenticated &&
       window.location.pathname ===
-        pageToPath.verification
+      pageToPath.verification
     ) {
       setVerificationOpen(true)
       setPage('home')
@@ -433,7 +463,7 @@ function App() {
     } catch (error) {
       setAuthError(
         error.message ||
-          'Unable to send the verification code. Please try again.'
+        'Unable to send the verification code. Please try again.'
       )
     } finally {
       setLoading(false)
@@ -468,10 +498,10 @@ function App() {
         'equiptrade_user_expires_at',
         String(
           Date.now() +
-            (
-              response.expiresIn ||
-              30 * 24 * 60 * 60 * 1000
-            )
+          (
+            response.expiresIn ||
+            30 * 24 * 60 * 60 * 1000
+          )
         )
       )
 
@@ -488,13 +518,15 @@ function App() {
       setVerificationOpen(false)
 
       const destination = pendingPage
+      const destinationOptions = pendingPageOptions
       const action = pendingAction
 
       setPendingPage(null)
+      setPendingPageOptions(null)
       setPendingAction(null)
 
       if (destination) {
-        navigate(destination)
+        navigate(destination, destinationOptions || {})
       } else if (action) {
         window.history.replaceState(
           {},
@@ -511,7 +543,7 @@ function App() {
     } catch (error) {
       setAuthError(
         error.message ||
-          'Unable to verify the code. Please try again.'
+        'Unable to verify the code. Please try again.'
       )
     } finally {
       setLoading(false)
@@ -563,14 +595,32 @@ function App() {
     setAdminAuthenticated(false)
   }
 
-  const navigate = nextPage => {
-    const nextPath =
-      pageToPath[nextPage]
+  const navigate = (nextPage, options = {}) => {
+    let nextPath = pageToPath[nextPage]
+
+    if (nextPage === 'product-detail') {
+      const slug =
+        options.slug ||
+        (options.product?.name ? toProductSlug(options.product.name) : '')
+      nextPath = `/buy/${slug}`
+      setSelectedProduct(options.product || null)
+      setProductSlug(slug)
+    } else if (typeof nextPage === 'string' && nextPage.startsWith('/')) {
+      nextPath = nextPage
+      if (nextPage.startsWith('/buy/') && nextPage.length > 5) {
+        nextPage = 'product-detail'
+        const slug = decodeURIComponent(nextPath.slice(5)).replace(/\/$/, '')
+        setSelectedProduct(options.product || null)
+        setProductSlug(slug)
+      } else {
+        nextPage = pathToPage[nextPath] || 'home'
+      }
+    }
 
     if (
       nextPath &&
       window.location.pathname !==
-        nextPath
+      nextPath
     ) {
       window.history.pushState(
         {},
@@ -579,7 +629,7 @@ function App() {
       )
     }
 
-    if (nextPage !== 'admin') {
+    if (nextPage !== 'admin' && nextPage !== 'product-detail') {
       localStorage.setItem(
         'equiptrade_page',
         nextPage
@@ -595,7 +645,7 @@ function App() {
     })
   }
 
-  const guardedNavigate = nextPage => {
+  const guardedNavigate = (nextPage, options = {}) => {
     const authenticated =
       hasActiveUserSession()
 
@@ -612,6 +662,7 @@ function App() {
       nextPage !== 'admin'
     ) {
       setPendingPage(nextPage)
+      setPendingPageOptions(options)
       setPendingAction(null)
 
       window.history.pushState(
@@ -625,7 +676,7 @@ function App() {
       return
     }
 
-    navigate(nextPage)
+    navigate(nextPage, options)
   }
 
   const requireVerification = action => {
@@ -794,7 +845,7 @@ function App() {
 
           <button
             className={
-              page === 'browse'
+              page === 'browse' || page === 'product-detail'
                 ? 'nav-link active'
                 : 'nav-link'
             }
@@ -872,6 +923,15 @@ function App() {
                 onLogout={logout}
               />
             )}
+            {profileOpen && (
+              <div className="mobile-profile-wrapper">
+                <AccountPanel
+                  user={user}
+                  close={() => setProfileOpen(false)}
+                  onLogout={logout}
+                />
+              </div>
+            )}
 
           </div>
 
@@ -892,17 +952,72 @@ function App() {
           </button>
 
         </div>
+
       </header>
+
+
+      <MobileDock
+        page={page}
+        navigate={guardedNavigate}
+        onProfile={handleProfileClick}
+        profileOpen={profileOpen}
+      />
+      {profileOpen && (
+        <div className="mobile-profile-card">
+          <div className="mobile-profile-header">
+            <div>
+              <h3>{user?.name || 'My Account'}</h3>
+              <p>
+                {user?.email || user?.mobileNumber || ''}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setProfileOpen(false)}
+              className="mobile-profile-close"
+              aria-label="Close profile"
+            >
+              ×
+            </button>
+          </div>
+
+          <div className="mobile-profile-info">
+            <div className="mobile-profile-row">
+              <span>Name</span>
+              <strong>{user?.name || 'Not available'}</strong>
+            </div>
+
+            <div className="mobile-profile-row">
+              <span>Email</span>
+              <strong>{user?.email || 'Not available'}</strong>
+            </div>
+
+            <div className="mobile-profile-row">
+              <span>Mobile</span>
+              <strong>
+                {user?.mobileNumber || 'Not available'}
+              </strong>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className="mobile-profile-logout"
+            onClick={logout}
+          >
+            Log out
+          </button>
+        </div>
+      )}
 
       {page === 'home' && (
         <HomePage
           navigate={guardedNavigate}
-          setSelected={item =>
-            requireVerification(
-              () =>
-                setSelected(item)
-            )
-          }
+          setSelected={item => {
+            const slug = toProductSlug(item?.name) || item?._id
+            guardedNavigate('product-detail', { product: item, slug })
+          }}
           search={search}
           setSearch={setSearch}
         />
@@ -912,13 +1027,22 @@ function App() {
         <BrowsePage
           search={search}
           setSearch={setSearch}
-          setSelected={item =>
-            requireVerification(
-              () =>
-                setSelected(item)
-            )
-          }
+          setSelected={item => {
+            const slug = toProductSlug(item?.name) || item?._id
+            guardedNavigate('product-detail', { product: item, slug })
+          }}
           navigate={guardedNavigate}
+        />
+      )}
+
+      {page === 'product-detail' && (
+        <ProductDetailPage
+          slug={productSlug}
+          product={selectedProduct}
+          navigate={guardedNavigate}
+          notify={notify}
+          requireVerification={requireVerification}
+          user={user}
         />
       )}
 
@@ -952,6 +1076,40 @@ function App() {
         </div>
       )}
     </div>
+  )
+}
+function MobileDock({ page, navigate, onProfile, profileOpen }) {
+  return (
+    <nav className="mobile-dock" aria-label="Quick navigation">
+      <button
+        className={page === 'home' ? 'mobile-dock-item active' : 'mobile-dock-item'}
+        onClick={() => navigate('home')}
+      >
+        <House size={19} />
+        <span>Home</span>
+      </button>
+      <button
+        className={page === 'browse' || page === 'product-detail' ? 'mobile-dock-item active' : 'mobile-dock-item'}
+        onClick={() => navigate('browse')}
+      >
+        <Search size={19} />
+        <span>Buy item</span>
+      </button>
+      <button
+        className="mobile-dock-item"
+        onClick={() => navigate('sell')}
+      >
+        <Upload size={18} />
+        <span>Sell item</span>
+      </button>
+      <button
+        className={profileOpen ? 'mobile-dock-item active' : 'mobile-dock-item'}
+        onClick={onProfile}
+      >
+        <UserRound size={19} />
+        <span>Account</span>
+      </button>
+    </nav>
   )
 }
 
@@ -1123,7 +1281,7 @@ function AdminLogin({ onLogin }) {
         'equiptrade_admin_expires_at',
         String(
           Date.now() +
-            response.expiresIn
+          response.expiresIn
         )
       )
 
@@ -1131,7 +1289,7 @@ function AdminLogin({ onLogin }) {
     } catch (requestError) {
       setError(
         requestError.message ||
-          'Unable to sign in.'
+        'Unable to sign in.'
       )
     } finally {
       setLoading(false)
@@ -2222,11 +2380,10 @@ function LegacyAdmin({
 
                   <td>
                     <button
-                      className={`status-pill ${
-                        index === 0
-                          ? 'pending'
-                          : 'approved'
-                      }`}
+                      className={`status-pill ${index === 0
+                        ? 'pending'
+                        : 'approved'
+                        }`}
                       onClick={() =>
                         setStatus(
                           index === 0
@@ -2628,8 +2785,8 @@ function Details({
           <p className="detail-price">
             {item.price
               ? `₹${Number(
-                  item.price
-                ).toLocaleString('en-IN')}`
+                item.price
+              ).toLocaleString('en-IN')}`
               : 'Price on request'}
           </p>
 

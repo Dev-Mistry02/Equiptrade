@@ -1,5 +1,5 @@
-import { Fragment, useEffect, useState } from 'react'
-import { LoaderCircle, ShieldCheck, Trash2, X } from 'lucide-react'
+import { Fragment, useCallback, useEffect, useState } from 'react'
+import { LoaderCircle, ShieldCheck, Trash2, X, RefreshCw } from 'lucide-react'
 import { api } from '../api'
 
 export default function Admin({ notify }) {
@@ -11,24 +11,125 @@ export default function Admin({ notify }) {
   const [error, setError] = useState('')
   const [expandedId, setExpandedId] = useState(null)
   const [processingId, setProcessingId] = useState(null)
-  const expandedItem = submissions.find(item => item._id === expandedId)
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+
+  const expandedItem = submissions.find(
+    (item) => item._id === expandedId
+  )
 
   // --------------------------------------------------
   // Fetch submissions
   // --------------------------------------------------
 
-  useEffect(() => {
-    const fetchSubmissions = async () => {
+  const fetchSubmissions = useCallback(
+    async ({ showLoader = true, retry = true } = {}) => {
       try {
-        const data = await api.getAdminSubmissions()
-        setSubmissions(data)
-      } catch (error) {
-        setError(error.message)
+        if (showLoader) {
+          setLoading(true)
+        }
+
+        setError('')
+
+        let data = null
+        let lastError = null
+
+        /*
+         * Try up to 3 times.
+         *
+         * This helps when the first request fails because
+         * the admin token/authentication is still initializing
+         * or the backend is temporarily unavailable.
+         */
+        const maxAttempts = retry ? 3 : 1
+
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+          try {
+            data = await api.getAdminSubmissions()
+            break
+          } catch (requestError) {
+            lastError = requestError
+
+            if (attempt < maxAttempts) {
+              await new Promise((resolve) =>
+                setTimeout(resolve, attempt * 500)
+              )
+            }
+          }
+        }
+
+        if (data === null) {
+          throw lastError || new Error('Failed to load submissions')
+        }
+
+        /*
+         * Make sure the API response is actually an array.
+         */
+        const normalizedData = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.submissions)
+            ? data.submissions
+            : Array.isArray(data?.data)
+              ? data.data
+              : []
+
+        setSubmissions(normalizedData)
+        setError('')
+      } catch (requestError) {
+        console.error(
+          'Failed to fetch admin submissions:',
+          requestError
+        )
+
+        setError(
+          requestError?.message ||
+            'Failed to load seller submissions.'
+        )
+      } finally {
+        setLoading(false)
+        setRefreshing(false)
       }
+    },
+    []
+  )
+
+  // --------------------------------------------------
+  // Initial load
+  // --------------------------------------------------
+
+  useEffect(() => {
+    let mounted = true
+
+    const loadInitialData = async () => {
+      if (!mounted) return
+
+      await fetchSubmissions({
+        showLoader: true,
+        retry: true,
+      })
     }
 
-    fetchSubmissions()
-  }, [])
+    loadInitialData()
+
+    return () => {
+      mounted = false
+    }
+  }, [fetchSubmissions])
+
+  // --------------------------------------------------
+  // Manual refresh
+  // --------------------------------------------------
+
+  const handleRefresh = async () => {
+    if (refreshing || loading) return
+
+    setRefreshing(true)
+
+    await fetchSubmissions({
+      showLoader: false,
+      retry: true,
+    })
+  }
 
   // --------------------------------------------------
   // Update submission status
@@ -36,31 +137,53 @@ export default function Admin({ notify }) {
 
   const updateStatus = async (id, status) => {
     if (processingId) return
-    setProcessingId(id)
-    try {
-      const updated = await api.updateSubmissionStatus(id, status)
 
+    setProcessingId(id)
+
+    try {
+      const updated = await api.updateSubmissionStatus(
+        id,
+        status
+      )
+
+      /*
+       * Update the row immediately.
+       * No page refresh required.
+       */
       setSubmissions((items) =>
         items.map((item) =>
-          item._id === id ? updated : item
+          item._id === id
+            ? {
+                ...item,
+                ...updated,
+              }
+            : item
         )
       )
 
       if (status === 'approved') {
         notify(
-          updated.emailSent
+          updated?.emailSent
             ? 'Approved and confirmation email sent'
-            : 'Approved and confirmation email sent'
+            : 'Listing approved successfully'
         )
       } else {
         notify(
-          updated.emailSent
+          updated?.emailSent
             ? 'Rejected and notification email sent'
-            : 'Rejected and notification email sent'
+            : 'Listing rejected successfully'
         )
       }
-    } catch (error) {
-      notify(error.message)
+    } catch (requestError) {
+      console.error(
+        'Failed to update submission:',
+        requestError
+      )
+
+      notify(
+        requestError?.message ||
+          'Failed to update submission'
+      )
     } finally {
       setProcessingId(null)
     }
@@ -80,15 +203,34 @@ export default function Admin({ notify }) {
     try {
       await api.deleteSubmission(item._id)
 
+      /*
+       * Remove immediately from UI.
+       */
       setSubmissions((items) =>
         items.filter(
           (current) => current._id !== item._id
         )
       )
 
+      /*
+       * Close expanded details if the deleted item
+       * was currently open.
+       */
+      if (expandedId === item._id) {
+        setExpandedId(null)
+      }
+
       notify('Listing deleted from the marketplace')
-    } catch (error) {
-      notify(error.message)
+    } catch (requestError) {
+      console.error(
+        'Failed to delete submission:',
+        requestError
+      )
+
+      notify(
+        requestError?.message ||
+          'Failed to delete submission'
+      )
     }
   }
 
@@ -110,8 +252,8 @@ export default function Admin({ notify }) {
   // --------------------------------------------------
 
   const toggleDetails = (id) => {
-    setExpandedId(
-      expandedId === id ? null : id
+    setExpandedId((currentId) =>
+      currentId === id ? null : id
     )
   }
 
@@ -143,10 +285,35 @@ export default function Admin({ notify }) {
           </p>
         </div>
 
-        <span className="admin-chip">
-          <ShieldCheck size={15} />
-          Middleman access
-        </span>
+        <div className="admin-header-actions">
+
+          {/* <button
+            type="button"
+            className="admin-refresh-button"
+            onClick={handleRefresh}
+            disabled={refreshing || loading}
+            aria-label="Refresh seller requests"
+          >
+            <RefreshCw
+              size={16}
+              className={
+                refreshing
+                  ? 'admin-refresh-spinning'
+                  : ''
+              }
+            />
+
+            {refreshing
+              ? 'Refreshing...'
+              : 'Refresh'}
+          </button> */}
+
+          <span className="admin-chip">
+            <ShieldCheck size={15} />
+            Middleman access
+          </span>
+
+        </div>
 
       </section>
 
@@ -159,20 +326,20 @@ export default function Admin({ notify }) {
 
         <Metric
           label="Total submissions"
-          value={submissions.length}
+          value={loading ? '—' : submissions.length}
           trend="From database"
         />
 
         <Metric
           label="Pending review"
-          value={pending}
+          value={loading ? '—' : pending}
           trend="Needs attention"
           warn
         />
 
         <Metric
           label="Accepted listings"
-          value={published}
+          value={loading ? '—' : published}
           trend="Visible to buyers"
         />
 
@@ -190,9 +357,23 @@ export default function Admin({ notify }) {
       ================================= */}
 
       {error && (
-        <p className="data-error">
-          {error}
-        </p>
+        <div className="data-error admin-error-state">
+
+          <p>
+            {error}
+          </p>
+
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={refreshing}
+          >
+            {refreshing
+              ? 'Trying again...'
+              : 'Try again'}
+          </button>
+
+        </div>
       )}
 
 
@@ -203,21 +384,91 @@ export default function Admin({ notify }) {
       <section className="admin-table-wrap">
 
         <div className="table-head">
+
           <h2>
             Seller requests
           </h2>
+
+          <button
+            type="button"
+            className="admin-refresh-small"
+            onClick={handleRefresh}
+            disabled={refreshing || loading}
+            aria-label="Refresh seller requests"
+          >
+            <RefreshCw
+              size={15}
+              className={
+                refreshing
+                  ? 'admin-refresh-spinning'
+                  : ''
+              }
+            />
+          </button>
+
         </div>
 
 
-        {/* Empty state */}
+        {/* ================================
+            LOADING STATE
+        ================================= */}
 
-        {!error && submissions.length === 0 ? (
+        {loading ? (
+
+          <div
+            className="admin-loading"
+            role="status"
+            aria-live="polite"
+          >
+            <LoaderCircle
+              size={26}
+              className="action-spinner"
+            />
+
+            <span>
+              Loading seller requests...
+            </span>
+          </div>
+
+        ) : error ? (
+
+          /* ================================
+              ERROR STATE
+          ================================= */
+
+          <div className="admin-empty-state">
+
+            <p>
+              Unable to load seller requests.
+            </p>
+
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={refreshing}
+            >
+              {refreshing
+                ? 'Retrying...'
+                : 'Retry'}
+            </button>
+
+          </div>
+
+        ) : submissions.length === 0 ? (
+
+          /* ================================
+              EMPTY STATE
+          ================================= */
 
           <p className="empty-state">
             No seller submissions yet.
           </p>
 
         ) : (
+
+          /* ================================
+              TABLE
+          ================================= */
 
           <table>
 
@@ -226,15 +477,39 @@ export default function Admin({ notify }) {
             ----------------------------- */}
 
             <thead>
+
               <tr>
-                <th>Equipment</th>
-                <th>Seller</th>
-                <th>Expected price</th>
-                <th>Submitted</th>
-                <th>Status</th>
-                <th>Decision</th>
-                <th>Remove</th>
+
+                <th>
+                  Equipment
+                </th>
+
+                <th>
+                  Seller
+                </th>
+
+                <th>
+                  Expected price
+                </th>
+
+                <th>
+                  Submitted
+                </th>
+
+                <th>
+                  Status
+                </th>
+
+                <th>
+                  Decision
+                </th>
+
+                <th>
+                  Remove
+                </th>
+
               </tr>
+
             </thead>
 
 
@@ -271,6 +546,7 @@ export default function Admin({ notify }) {
                           <img
                             src={item.images?.[0] || ''}
                             alt=""
+                            loading="lazy"
                           />
 
                           <span>
@@ -302,13 +578,19 @@ export default function Admin({ notify }) {
                       <br />
 
                       <small>
+
                         {item.seller?.mobileNumber ? (
-                          <a href={`tel:${item.seller.mobileNumber}`}>
+
+                          <a
+                            href={`tel:${item.seller.mobileNumber}`}
+                          >
                             {item.seller.mobileNumber}
                           </a>
+
                         ) : (
                           ''
                         )}
+
                       </small>
 
                     </td>
@@ -320,8 +602,8 @@ export default function Admin({ notify }) {
 
                       {item.price
                         ? `₹${Number(
-                          item.price
-                        ).toLocaleString('en-IN')}`
+                            item.price
+                          ).toLocaleString('en-IN')}`
                         : 'Price on request'}
 
                     </td>
@@ -333,8 +615,10 @@ export default function Admin({ notify }) {
 
                       {item.createdAt
                         ? new Date(
-                          item.createdAt
-                        ).toLocaleDateString('en-IN')
+                            item.createdAt
+                          ).toLocaleDateString(
+                            'en-IN'
+                          )
                         : '—'}
 
                     </td>
@@ -347,9 +631,9 @@ export default function Admin({ notify }) {
                       <span
                         className={`submission-status status-${item.status}`}
                       >
-
-                        {getStatusLabel(item.status)}
-
+                        {getStatusLabel(
+                          item.status
+                        )}
                       </span>
 
                     </td>
@@ -366,7 +650,9 @@ export default function Admin({ notify }) {
                           <button
                             type="button"
                             className="approve-button"
-                            disabled={processingId !== null}
+                            disabled={
+                              processingId !== null
+                            }
                             onClick={() =>
                               updateStatus(
                                 item._id,
@@ -380,7 +666,9 @@ export default function Admin({ notify }) {
                           <button
                             type="button"
                             className="reject-button"
-                            disabled={processingId !== null}
+                            disabled={
+                              processingId !== null
+                            }
                             onClick={() =>
                               updateStatus(
                                 item._id,
@@ -438,32 +726,127 @@ export default function Admin({ notify }) {
                       <td colSpan="7">
 
                         <div className="admin-product-details">
+
                           <div className="admin-product-image">
-                            {item.images?.[0]
-                              ? <img src={item.images[0]} alt={item.name} />
-                              : <span>No image provided</span>}
+
+                            {item.images?.[0] ? (
+
+                              <img
+                                src={item.images[0]}
+                                alt={item.name}
+                                loading="lazy"
+                              />
+
+                            ) : (
+
+                              <span>
+                                No image provided
+                              </span>
+
+                            )}
+
                           </div>
+
+
                           <div className="admin-product-info">
-                            <span className="eyebrow">Product details</span>
-                            <h3>{item.name}</h3>
-                            <p>{item.description || 'No description provided.'}</p>
+
+                            <span className="eyebrow">
+                              Product details
+                            </span>
+
+                            <h3>
+                              {item.name}
+                            </h3>
+
+                            <p>
+                              {item.description ||
+                                'No description provided.'}
+                            </p>
+
                             <div className="admin-product-facts">
-                              <span><b>Category</b>{item.category || 'Not available'}</span>
-                              <span><b>Brand</b>{item.brand || 'Not available'}</span>
-                              <span><b>Model</b>{item.model || 'Not available'}</span>
-                              <span><b>Year</b>{item.year || 'Not available'}</span>
-                              <span><b>Condition</b>{item.condition || 'Not available'}</span>
-                              <span><b>Location</b>{item.location || 'Not available'}</span>
-                              <span><b>Price</b>{item.price ? `₹${Number(item.price).toLocaleString('en-IN')}` : 'Price on request'}</span>
-                              <span><b>Status</b>{getStatusLabel(item.status)}</span>
+
+                              <span>
+                                <b>Category</b>
+                                {item.category ||
+                                  'Not available'}
+                              </span>
+
+                              <span>
+                                <b>Brand</b>
+                                {item.brand ||
+                                  'Not available'}
+                              </span>
+
+                              <span>
+                                <b>Model</b>
+                                {item.model ||
+                                  'Not available'}
+                              </span>
+
+                              <span>
+                                <b>Year</b>
+                                {item.year ||
+                                  'Not available'}
+                              </span>
+
+                              <span>
+                                <b>Condition</b>
+                                {item.condition ||
+                                  'Not available'}
+                              </span>
+
+                              <span>
+                                <b>Location</b>
+                                {item.location ||
+                                  'Not available'}
+                              </span>
+
+                              <span>
+                                <b>Price</b>
+                                {item.price
+                                  ? `₹${Number(
+                                      item.price
+                                    ).toLocaleString(
+                                      'en-IN'
+                                    )}`
+                                  : 'Price on request'}
+                              </span>
+
+                              <span>
+                                <b>Status</b>
+                                {getStatusLabel(
+                                  item.status
+                                )}
+                              </span>
+
                             </div>
+
                           </div>
+
+
                           <div className="admin-seller-details">
-                            <span className="eyebrow">Seller details</span>
-                            <strong>{item.seller?.name || 'Not available'}</strong>
-                            <span>{item.seller?.mobileNumber || 'Phone not available'}</span>
-                            <span>{item.seller?.email || 'Email not available'}</span>
+
+                            <span className="eyebrow">
+                              Seller details
+                            </span>
+
+                            <strong>
+                              {item.seller?.name ||
+                                'Not available'}
+                            </strong>
+
+                            <span>
+                              {item.seller?.mobileNumber ||
+                                'Phone not available'}
+                            </span>
+
+                            <span>
+                              {item.seller?.email ||
+                                'Email not available'}
+                            </span>
+
                           </div>
+
                         </div>
 
                       </td>
@@ -484,50 +867,193 @@ export default function Admin({ notify }) {
 
       </section>
 
+
+      {/* ================================
+          PRODUCT MODAL
+      ================================= */}
+
       {expandedItem && (
-        <div className="admin-product-modal" role="dialog" aria-modal="true" aria-label={`${expandedItem.name} details`}>
-          <button type="button" className="admin-product-modal-backdrop" aria-label="Close product details" onClick={() => setExpandedId(null)} />
+
+        <div
+          className="admin-product-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`${expandedItem.name} details`}
+        >
+
+          <button
+            type="button"
+            className="admin-product-modal-backdrop"
+            aria-label="Close product details"
+            onClick={() =>
+              setExpandedId(null)
+            }
+          />
+
           <section className="admin-product-modal-card">
-            <button type="button" className="admin-product-modal-close" aria-label="Close product details" onClick={() => setExpandedId(null)}>
+
+            <button
+              type="button"
+              className="admin-product-modal-close"
+              aria-label="Close product details"
+              onClick={() =>
+                setExpandedId(null)
+              }
+            >
               <X size={18} />
             </button>
+
             <div className="admin-product-details">
+
               <div className="admin-product-image">
-                {expandedItem.images?.[0]
-                  ? <img src={expandedItem.images[0]} alt={expandedItem.name} />
-                  : <span>No image provided</span>}
+
+                {expandedItem.images?.[0] ? (
+
+                  <img
+                    src={expandedItem.images[0]}
+                    alt={expandedItem.name}
+                  />
+
+                ) : (
+
+                  <span>
+                    No image provided
+                  </span>
+
+                )}
+
               </div>
+
+
               <div className="admin-product-info">
-                <span className="eyebrow">Product details</span>
-                <h3>{expandedItem.name}</h3>
-                <p>{expandedItem.description || 'No description provided.'}</p>
+
+                <span className="eyebrow">
+                  Product details
+                </span>
+
+                <h3>
+                  {expandedItem.name}
+                </h3>
+
+                <p>
+                  {expandedItem.description ||
+                    'No description provided.'}
+                </p>
+
                 <div className="admin-product-facts">
-                  <span><b>Category</b>{expandedItem.category || 'Not available'}</span>
-                  <span><b>Brand</b>{expandedItem.brand || 'Not available'}</span>
-                  <span><b>Model</b>{expandedItem.model || 'Not available'}</span>
-                  <span><b>Year</b>{expandedItem.year || 'Not available'}</span>
-                  <span><b>Condition</b>{expandedItem.condition || 'Not available'}</span>
-                  <span><b>Location</b>{expandedItem.location || 'Not available'}</span>
-                  <span><b>Price</b>{expandedItem.price ? `₹${Number(expandedItem.price).toLocaleString('en-IN')}` : 'Price on request'}</span>
-                  <span><b>Status</b>{getStatusLabel(expandedItem.status)}</span>
+
+                  <span>
+                    <b>Category</b>
+                    {expandedItem.category ||
+                      'Not available'}
+                  </span>
+
+                  <span>
+                    <b>Brand</b>
+                    {expandedItem.brand ||
+                      'Not available'}
+                  </span>
+
+                  <span>
+                    <b>Model</b>
+                    {expandedItem.model ||
+                      'Not available'}
+                  </span>
+
+                  <span>
+                    <b>Year</b>
+                    {expandedItem.year ||
+                      'Not available'}
+                  </span>
+
+                  <span>
+                    <b>Condition</b>
+                    {expandedItem.condition ||
+                      'Not available'}
+                  </span>
+
+                  <span>
+                    <b>Location</b>
+                    {expandedItem.location ||
+                      'Not available'}
+                  </span>
+
+                  <span>
+                    <b>Price</b>
+                    {expandedItem.price
+                      ? `₹${Number(
+                          expandedItem.price
+                        ).toLocaleString(
+                          'en-IN'
+                        )}`
+                      : 'Price on request'}
+                  </span>
+
+                  <span>
+                    <b>Status</b>
+                    {getStatusLabel(
+                      expandedItem.status
+                    )}
+                  </span>
+
                 </div>
+
               </div>
+
+
               <div className="admin-seller-details">
-                <span className="eyebrow">Seller details</span>
-                <strong>{expandedItem.seller?.name || 'Not available'}</strong>
-                <span>{expandedItem.seller?.mobileNumber || 'Phone not available'}</span>
-                <span>{expandedItem.seller?.email || 'Email not available'}</span>
+
+                <span className="eyebrow">
+                  Seller details
+                </span>
+
+                <strong>
+                  {expandedItem.seller?.name ||
+                    'Not available'}
+                </strong>
+
+                <span>
+                  {expandedItem.seller?.mobileNumber ||
+                    'Phone not available'}
+                </span>
+
+                <span>
+                  {expandedItem.seller?.email ||
+                    'Email not available'}
+                </span>
+
               </div>
+
             </div>
+
           </section>
+
         </div>
+
       )}
 
+
+      {/* ================================
+          PROCESSING TOAST
+      ================================= */}
+
       {processingId && (
-        <div className="toast action-toast" role="status" aria-live="polite">
-          <LoaderCircle className="action-spinner" size={18} />
+
+        <div
+          className="toast action-toast"
+          role="status"
+          aria-live="polite"
+        >
+
+          <LoaderCircle
+            className="action-spinner"
+            size={18}
+          />
+
           Sending email...
+
         </div>
+
       )}
 
     </main>
@@ -543,7 +1069,7 @@ function Metric({
   label,
   value,
   trend,
-  warn
+  warn,
 }) {
   return (
     <div className="metric">
@@ -556,7 +1082,13 @@ function Metric({
         {value}
       </strong>
 
-      <small className={warn ? 'warn-text' : ''}>
+      <small
+        className={
+          warn
+            ? 'warn-text'
+            : ''
+        }
+      >
         {trend}
       </small>
 

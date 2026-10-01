@@ -4,11 +4,13 @@ import {
   LoaderCircle,
   Search,
   SlidersHorizontal,
+  X,
 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api'
 import { EquipmentCard } from '../components/MarketplaceComponents'
 import { categories } from '../data'
+import { toProductSlug } from './ProductDetail'
 
 export default function Browse({
   search,
@@ -29,12 +31,27 @@ export default function Browse({
   })
 
   const [showFilters, setShowFilters] = useState(false)
+  
+  const priceRange = (() => {
+    const prices = equipment
+      .map(item => Number(item.price))
+      .filter(price => Number.isFinite(price) && price > 0)
+
+    if (!prices.length) {
+      return {
+        min: 0,
+        max: 0,
+      }
+    }
+
+    return {
+      min: Math.min(...prices),
+      max: Math.max(...prices),
+    }
+  })()
 
   /*
    * Fetch marketplace data
-   * --------------------------------------------------
-   * requestId prevents an older/slower API response
-   * from replacing newer data.
    */
   const fetchEquipment = useCallback(async () => {
     const requestId = Date.now()
@@ -46,12 +63,9 @@ export default function Browse({
       const data = await api.getEquipment({
         search,
         ...filters,
-        _t: requestId, // prevents stale cached responses
+        _t: requestId,
       })
 
-      /*
-       * Only use valid array responses.
-       */
       if (Array.isArray(data)) {
         setEquipment(data)
       } else {
@@ -65,6 +79,8 @@ export default function Browse({
     }
   }, [search, filters])
 
+
+
   /*
    * Initial loading + search/filter changes
    */
@@ -77,8 +93,7 @@ export default function Browse({
   }, [fetchEquipment])
 
   /*
-   * Refresh marketplace whenever user comes back
-   * to this browser tab/window.
+   * Refresh when user returns to tab/window
    */
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -109,10 +124,7 @@ export default function Browse({
   }, [fetchEquipment])
 
   /*
-   * Automatically check for newly approved/updated listings
-   * every 15 seconds while the page is open.
-   *
-   * This means the user doesn't need to manually refresh.
+   * Automatically refresh marketplace
    */
   useEffect(() => {
     const interval = setInterval(() => {
@@ -152,9 +164,17 @@ export default function Browse({
   }
 
   /*
+   * Close mobile filter drawer
+   */
+  const closeFilters = () => {
+    setShowFilters(false)
+  }
+
+  /*
    * Count active filters
    */
-  const activeFilters = Object.values(filters).filter(Boolean).length
+  const activeFilters =
+    Object.values(filters).filter(Boolean).length
 
   return (
     <main className="container page">
@@ -195,10 +215,13 @@ export default function Browse({
 
         {/* FILTER BUTTON */}
         <button
+          type="button"
           className="filter-button"
           onClick={() =>
-            setShowFilters(value => !value)
+            setShowFilters(current => !current)
           }
+          aria-expanded={showFilters}
+          aria-controls="marketplace-filters"
         >
           <SlidersHorizontal size={17} />
 
@@ -224,19 +247,55 @@ export default function Browse({
       </div>
 
 
+      {/* MOBILE FILTER BACKDROP */}
+      {showFilters && (
+        <button
+          type="button"
+          className="mobile-filter-backdrop"
+          aria-label="Close filters"
+          onClick={closeFilters}
+        />
+      )}
+
+
       {/* BROWSE LAYOUT */}
       <div
-        className={`browse-layout ${
-          showFilters ? 'filters-open' : ''
-        }`}
+        className={`browse-layout ${showFilters ? 'filters-open' : ''
+          }`}
       >
 
         {/* FILTER PANEL */}
-        <aside className="filter-panel">
+        <aside
+          id="marketplace-filters"
+          className={`filter-panel ${showFilters ? 'mobile-filter-visible' : ''
+            }`}
+        >
 
+          {/* FILTER HEADER */}
           <div className="filter-title">
-            Refine results
-            <Filter size={16} />
+
+            <span>
+              Refine results
+            </span>
+
+            <div className="filter-title-actions">
+
+              <Filter
+                size={16}
+                className="desktop-filter-icon"
+              />
+
+              <button
+                type="button"
+                className="mobile-filter-close"
+                onClick={closeFilters}
+                aria-label="Close filters"
+              >
+                <X size={19} />
+              </button>
+
+            </div>
+
           </div>
 
 
@@ -278,19 +337,19 @@ export default function Browse({
                 Any condition
               </option>
 
-              <option>
+              <option value="Excellent">
                 Excellent
               </option>
 
-              <option>
+              <option value="Like New">
                 Like New
               </option>
 
-              <option>
+              <option value="Good">
                 Good
               </option>
 
-              <option>
+              <option value="Fair">
                 Fair
               </option>
             </select>
@@ -301,37 +360,55 @@ export default function Browse({
           <label className="filter-control">
             Price range
 
-            <select
-              value={`${filters.minPrice}-${filters.maxPrice}`}
-              onChange={event => {
-                const [
-                  minPrice,
-                  maxPrice,
-                ] = event.target.value.split('-')
+            <div className="price-range-inputs">
 
-                setFilters(current => ({
-                  ...current,
-                  minPrice,
-                  maxPrice,
-                }))
-              }}
-            >
-              <option value="-">
-                Any price
-              </option>
+              <div className="price-input">
+                <span>Min</span>
 
-              <option value="0-1000000">
-                Under ₹10 lakh
-              </option>
+                <input
+                  type="number"
+                  min={priceRange.min}
+                  max={priceRange.max}
+                  value={filters.minPrice}
+                  placeholder={`₹${priceRange.min.toLocaleString('en-IN')}`}
+                  onChange={event => {
+                    setFilters(current => ({
+                      ...current,
+                      minPrice: event.target.value,
+                    }))
+                  }}
+                />
+              </div>
 
-              <option value="1000000-2500000">
-                ₹10–25 lakh
-              </option>
+              <span className="price-range-separator">
+                —
+              </span>
 
-              <option value="2500000-">
-                Above ₹25 lakh
-              </option>
-            </select>
+              <div className="price-input">
+                <span>Max</span>
+
+                <input
+                  type="number"
+                  min={priceRange.min}
+                  max={priceRange.max}
+                  value={filters.maxPrice}
+                  placeholder={`₹${priceRange.max.toLocaleString('en-IN')}`}
+                  onChange={event => {
+                    setFilters(current => ({
+                      ...current,
+                      maxPrice: event.target.value,
+                    }))
+                  }}
+                />
+              </div>
+
+            </div>
+
+            <small className="price-range-info">
+              ₹{priceRange.min.toLocaleString('en-IN')}
+              {' — '}
+              ₹{priceRange.max.toLocaleString('en-IN')}
+            </small>
           </label>
 
 
@@ -348,13 +425,26 @@ export default function Browse({
           </label>
 
 
-          {/* CLEAR */}
-          <button
-            className="clear-filter"
-            onClick={clearFilters}
-          >
-            Clear all filters
-          </button>
+          {/* FILTER ACTIONS */}
+          <div className="filter-actions">
+
+            <button
+              type="button"
+              className="clear-filter"
+              onClick={clearFilters}
+            >
+              Clear all filters
+            </button>
+
+            <button
+              type="button"
+              className="filter-done-button"
+              onClick={closeFilters}
+            >
+              Apply filters
+            </button>
+
+          </div>
 
         </aside>
 
@@ -368,6 +458,7 @@ export default function Browse({
             </p>
           ) : (
             <>
+
               {/* RESULTS META */}
               <div className="results-meta">
 
@@ -393,9 +484,13 @@ export default function Browse({
                     <EquipmentCard
                       item={item}
                       key={item._id}
-                      onClick={() =>
-                        setSelected(item)
-                      }
+                      onClick={() => {
+                        const slug = toProductSlug(item.name) || item._id
+                        navigate('product-detail', {
+                          product: item,
+                          slug,
+                        })
+                      }}
                     />
                   ))}
 

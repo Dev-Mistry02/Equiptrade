@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import Equipment from '../models/Equipment.js'
 import User from '../models/User.js'
+import mongoose from 'mongoose'
 import { sendListingSubmissionEmail } from '../services/mailer.js'
 import { requireUser } from '../middleware/userAuth.js'
 
@@ -67,11 +68,58 @@ router.get('/', async (req, res) => {
   }
 })
 
+router.get('/:idOrSlug', async (req, res) => {
+  try {
+    const { idOrSlug } = req.params
+    let item = null
+
+    if (mongoose.Types.ObjectId.isValid(idOrSlug)) {
+      item = await Equipment.findOne({
+        _id: idOrSlug,
+        status: { $in: ['approved', 'published'] },
+      }).populate('seller', 'name email')
+    }
+
+    if (!item) {
+      const all = await Equipment.find({
+        status: { $in: ['approved', 'published'] },
+      }).populate('seller', 'name email')
+
+      const target = decodeURIComponent(idOrSlug).toLowerCase().trim()
+      item = all.find(e => {
+        const slug = (e.name || '')
+          .toLowerCase()
+          .trim()
+          .replace(/[^\w\s-]/g, '')
+          .replace(/[\s_-]+/g, '-')
+        const raw = (e.name || '').toLowerCase().trim()
+        return (
+          slug === target ||
+          raw === target ||
+          raw.replace(/\s+/g, '-') === target
+        )
+      })
+    }
+
+    if (!item) {
+      return res.status(404).json({
+        message: 'Equipment listing not found.',
+      })
+    }
+
+    res.json(item)
+  } catch (error) {
+    res.status(500).json({
+      message: error.message,
+    })
+  }
+})
+
 router.post('/', requireUser, async (req, res) => {
   try {
     if (
       !Array.isArray(req.body.images) ||
-      !req.body.images.length ||
+      req.body.images.length < 3 ||
       req.body.images.some(
         image =>
           typeof image !== 'string' ||
@@ -79,7 +127,7 @@ router.post('/', requireUser, async (req, res) => {
       )
     ) {
       return res.status(400).json({
-        message: 'Add at least one valid Cloudinary image URL.',
+        message: 'Add at least 3 valid Cloudinary image URLs.',
       })
     }
 

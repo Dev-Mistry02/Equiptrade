@@ -1,0 +1,902 @@
+/* =========================================================
+   EQUIPTRADE INDIA - PRODUCT DETAIL PAGE THEME
+   ========================================================= */
+
+.product-detail-page {
+  padding-top: 36px;
+  padding-bottom: 90px;
+}
+
+/* ---------------- Breadcrumbs & Navigation Bar ---------------- */
+.pd-nav-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 26px;
+}
+
+.pd-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--blue);
+  background: var(--blue-soft);
+  padding: 8px 14px;
+  border-radius: 8px;
+  transition: background 0.2s, transform 0.15s;
+}
+
+.pd-back-btn:hover {
+  background: #d8ebf5;
+  transform: translateX(-3px);
+}
+
+.pd-breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.pd-breadcrumbs button {
+  color: var(--muted);
+  font-size: 12px;
+  padding: 0;
+  transition: color 0.15s;
+}
+
+.pd-breadcrumbs button:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.pd-breadcrumbs .pd-bc-current {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.pd-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pd-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  background: white;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  transition: all 0.2s;
+}
+
+.pd-action-btn:hover {
+  border-color: #bcccd6;
+  background: #f8fbfb;
+}
+
+.pd-action-btn.saved {
+  color: #d13438;
+  border-color: #f7c5c5;
+  background: #fdf3f3;
+}
+
+/* ---------------- Main Layout ---------------- */
+.pd-main-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: 36px;
+  align-items: start;
+  margin-bottom: 48px;
+}
+
+/* ---------------- Left Gallery ---------------- */
+.pd-gallery-card {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.pd-main-image-wrap {
+  position: relative;
+  width: 100%;
+  height: 440px;
+  background: #e9eff2;
+  overflow: hidden;
+}
+
+.pd-main-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.pd-main-image-wrap:hover .pd-main-image {
+  transform: scale(1.02);
+}
+
+.pd-image-empty {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #8a9aa4;
+  font-size: 13px;
+  background: #f1f5f7;
+}
+
+.pd-badge-verified {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #277258;
+  padding: 7px 12px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  box-shadow: 0 4px 12px rgba(16, 42, 67, 0.12);
+}
+
+.pd-image-counter {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  background: rgba(16, 42, 67, 0.78);
+  color: white;
+  padding: 5px 11px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.pd-thumbnails {
+  display: flex;
+  gap: 10px;
+  padding: 16px 20px;
+  background: #fafbfc;
+  border-top: 1px solid var(--line);
+  overflow-x: auto;
+}
+
+.pd-thumb-btn {
+  flex: none;
+  width: 72px;
+  height: 56px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid transparent;
+  padding: 0;
+  opacity: 0.7;
+  transition: all 0.2s;
+  background: #eaeff1;
+}
+
+.pd-thumb-btn.active {
+  border-color: var(--blue);
+  opacity: 1;
+  box-shadow: 0 0 0 2px rgba(29, 111, 165, 0.2);
+}
+
+.pd-thumb-btn:hover {
+  opacity: 1;
+}
+
+.pd-thumb-btn img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Trust Strip below Gallery */
+.pd-trust-highlights {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.pd-trust-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.pd-trust-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: #eaf5f0;
+  color: #32856c;
+  flex-shrink: 0;
+}
+
+.pd-trust-text strong {
+  display: block;
+  font-size: 12px;
+  color: var(--ink);
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.pd-trust-text small {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+/* ---------------- Right Info Card ---------------- */
+.pd-info-card {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 34px 32px;
+  box-shadow: var(--shadow);
+}
+
+.pd-header-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.pd-category-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--blue-soft);
+  color: var(--blue);
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.pd-listing-id {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: #8a9aa4;
+  letter-spacing: 0.8px;
+}
+
+.pd-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(26px, 3vw, 34px);
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.15;
+  letter-spacing: -1px;
+  margin: 0 0 10px;
+}
+
+.pd-subtitle {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 22px;
+}
+
+/* Pricing box */
+.pd-price-box {
+  background: #f7fafc;
+  border: 1px solid #e2edf2;
+  border-radius: 12px;
+  padding: 18px 22px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.pd-price-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #798d9c;
+  font-weight: 700;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.pd-price-amount {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1;
+}
+
+.pd-price-terms {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.pd-price-tag {
+  background: #e4f2ec;
+  color: #277258;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 5px;
+}
+
+.pd-price-note {
+  font-size: 10px;
+  color: #8fa0ab;
+}
+
+/* Quick specs grid */
+.pd-quick-specs {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 18px 0;
+  margin-bottom: 22px;
+}
+
+.pd-spec-tile {
+  background: #fafbfc;
+  border: 1px solid #edf2f4;
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+.pd-spec-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: #8c9ea9;
+  margin-bottom: 3px;
+}
+
+.pd-spec-value {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+/* Location banner */
+.pd-location-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 24px;
+  padding: 10px 14px;
+  background: #f8fafb;
+  border-radius: 8px;
+  border: 1px solid #edf2f4;
+}
+
+.pd-location-banner svg {
+  color: var(--blue);
+  flex-shrink: 0;
+}
+
+.pd-location-banner strong {
+  color: var(--ink);
+}
+
+/* CTAs */
+.pd-cta-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.pd-enquire-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: var(--ink);
+  color: white;
+  border-radius: 10px;
+  padding: 15px 22px;
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: 0 8px 24px rgba(16, 42, 67, 0.16);
+  transition: transform 0.2s, background 0.2s;
+}
+
+.pd-enquire-btn:hover {
+  background: #1b4568;
+  transform: translateY(-2px);
+}
+
+.pd-secondary-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: white;
+  border: 1px solid #b9d2db;
+  color: var(--blue);
+  border-radius: 10px;
+  padding: 12px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.pd-secondary-btn:hover {
+  background: #edf5f9;
+  border-color: var(--blue);
+}
+
+/* ---------------- Specifications & Details Section ---------------- */
+.pd-details-card {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 36px;
+  box-shadow: var(--shadow);
+  margin-bottom: 48px;
+}
+
+.pd-section-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.5px;
+  margin: 0 0 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pd-description-content {
+  font-size: 14px;
+  line-height: 1.75;
+  color: #475f70;
+  margin-bottom: 34px;
+  white-space: pre-line;
+}
+
+.pd-specs-table-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px 28px;
+  border-top: 1px solid var(--line);
+  padding-top: 26px;
+}
+
+.pd-spec-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #f0f4f6;
+  font-size: 13px;
+}
+
+.pd-spec-row span {
+  color: #7b8f9e;
+}
+
+.pd-spec-row strong {
+  color: var(--ink);
+  font-weight: 600;
+  text-align: right;
+}
+
+/* ---------------- Safe Escrow & Protection Banner ---------------- */
+.pd-protection-strip {
+  background: linear-gradient(135deg, #102a43 0%, #1a3c5a 100%);
+  color: white;
+  border-radius: 16px;
+  padding: 40px;
+  margin-bottom: 48px;
+}
+
+.pd-protection-header {
+  max-width: 540px;
+  margin-bottom: 28px;
+}
+
+.pd-protection-header span {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #8ed6ba;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.pd-protection-header h3 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -1px;
+  margin: 0;
+}
+
+.pd-protection-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.pd-protection-card {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 22px;
+}
+
+.pd-protection-card h4 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 8px;
+  color: white;
+}
+
+.pd-protection-card p {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #b5c7d2;
+  margin: 0;
+}
+
+/* ---------------- Related Equipment ---------------- */
+.pd-related-section {
+  margin-bottom: 40px;
+}
+
+.pd-related-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.pd-related-header h3 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.8px;
+  margin: 6px 0 0;
+}
+
+/* ---------------- Sticky Mobile Enquiry Bar ---------------- */
+.pd-mobile-sticky-bar {
+  display: none;
+}
+
+@media (max-width: 850px) {
+
+  /* .product-detail-page {
+    padding: 12px 14px 90px;
+    width: 100%;
+    overflow-x: hidden;
+  } */
+
+  /* -----------------------------------------
+     TOP NAV
+  ----------------------------------------- */
+  .pd-trust-highlights {
+    display: none;
+  }
+
+  .pd-nav-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .pd-back-btn {
+    border: 0;
+    background: transparent;
+    padding: 6px 0;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .pd-breadcrumbs {
+    display: none !important;
+  }
+
+  .pd-top-actions {
+    display: flex;
+    gap: 5px;
+  }
+
+  .pd-action-btn {
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: 0;
+  }
+
+  .pd-action-btn svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .pd-main-grid {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+
+  .pd-main-image-wrap {
+    height: 320px;
+  }
+
+  .pd-trust-highlights {
+    grid-template-columns: 1fr;
+  }
+
+  .pd-info-card,
+  .pd-details-card,
+  .pd-protection-strip {
+    padding: 24px 20px;
+  }
+
+  .pd-specs-table-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pd-protection-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .pd-mobile-sticky-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 85;
+    background: white;
+    border-top: 1px solid var(--line);
+    padding: 12px 20px;
+    box-shadow: 0 -8px 25px rgba(16, 42, 67, 0.12);
+  }
+
+  .pd-mobile-price {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 19px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.1;
+  }
+
+  .pd-mobile-price small {
+    display: block;
+    font-size: 10px;
+    color: var(--muted);
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 400;
+  }
+
+  .pd-mobile-enquire-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--ink);
+    color: white;
+    padding: 11px 18px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .product-detail-page {
+    padding-bottom: 120px;
+  }
+}
+
+/* ---------------- Interactive Enquiry Modal ---------------- */
+.pd-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(16, 42, 67, 0.55);
+  backdrop-filter: blur(4px);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.pd-modal-box {
+  position: relative;
+  width: min(520px, 100%);
+  background: white;
+  border-radius: 16px;
+  padding: 32px;
+  box-shadow: 0 24px 70px rgba(16, 42, 67, 0.25);
+  border: 1px solid var(--line);
+}
+
+.pd-modal-close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  color: #7b8f9e;
+  padding: 4px;
+  border-radius: 6px;
+  transition: color 0.15s;
+}
+
+.pd-modal-close:hover {
+  color: var(--ink);
+}
+
+.pd-modal-header {
+  margin-bottom: 22px;
+}
+
+.pd-modal-header h3 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 6px 0 4px;
+}
+
+.pd-modal-header p {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0;
+}
+
+.pd-modal-product-summary {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: #f7fafb;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 20px;
+}
+
+.pd-modal-thumb {
+  width: 56px;
+  height: 48px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: #e2edf2;
+  flex-shrink: 0;
+}
+
+.pd-modal-form {
+  display: grid;
+  gap: 14px;
+}
+
+.pd-modal-form label {
+  display: grid;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #466074;
+}
+
+.pd-modal-form input,
+.pd-modal-form textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--ink);
+  background: #fbfcfc;
+  outline: none;
+}
+
+.pd-modal-form textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.pd-modal-form input:focus,
+.pd-modal-form textarea:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(29, 111, 165, 0.1);
+}
+
+.pd-modal-submit-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--ink);
+  color: white;
+  border-radius: 9px;
+  padding: 13px 20px;
+  font-size: 13px;
+  font-weight: 700;
+  margin-top: 8px;
+}
+
+.pd-modal-submit-btn:hover {
+  background: #1b4568;
+}
+
+/* ---------------- Empty State ---------------- */
+.pd-not-found {
+  text-align: center;
+  padding: 80px 20px;
+  max-width: 540px;
+  margin: 0 auto;
+}
+
+.pd-not-found h2 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 16px 0 10px;
+}
+
+.pd-not-found p {
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.6;
+  margin-bottom: 28px;
+}

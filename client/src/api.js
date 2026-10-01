@@ -106,6 +106,9 @@ export const api = {
     )
   },
 
+  getEquipmentByIdOrSlug: idOrSlug =>
+    request(`/equipment/${encodeURIComponent(idOrSlug)}`),
+
   getAdminSubmissions: () =>
     request('/admin/submissions'),
 
