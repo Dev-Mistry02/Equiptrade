@@ -1,16 +1,37 @@
-import nodemailer from 'nodemailer'
+import postmark from 'postmark'
 import { env } from '../config/env.js'
 
-const transporter = env.mailHost && env.mailUser
-  ? nodemailer.createTransport({ host: env.mailHost, port: env.mailPort, secure: env.mailPort === 465, auth: { user: env.mailUser, pass: env.mailPassword } })
+const postmarkClient = env.postmarkServerToken
+  ? new postmark.ServerClient(env.postmarkServerToken)
   : null
 
-export async function sendOtpEmail(email, otp) {
-  if (!transporter) {
-    console.warn(`[development] OTP for ${email}: ${otp}`)
-    return
+async function sendEmail({ from, to, subject, text, html }) {
+  if (!postmarkClient) {
+    throw new Error('POSTMARK_SERVER_TOKEN is not configured; email delivery is unavailable.')
   }
-  await transporter.sendMail({
+
+  if (!from) {
+    throw new Error('MAIL_FROM is required when Postmark email delivery is enabled.')
+  }
+
+  const response = await postmarkClient.sendEmail({
+    From: from,
+    To: to,
+    Subject: subject,
+    TextBody: text,
+    HtmlBody: html,
+    MessageStream: env.mailMessageStream,
+  })
+
+  if (!response?.MessageID) {
+    throw new Error('Postmark accepted no message ID; email delivery could not be confirmed.')
+  }
+
+  return true
+}
+
+export async function sendOtpEmail(email, otp) {
+  await sendEmail({
     from: env.mailFrom,
     to: email,
     subject: 'Your EquipTrade India verification code',
@@ -21,11 +42,7 @@ export async function sendOtpEmail(email, otp) {
 
 export async function sendListingSubmissionEmail(email, name, equipmentName) {
   if (!email) throw new Error('Seller email is missing; submission email was not sent.')
-  if (!transporter) {
-    console.warn(`[development] Submission email for ${email}: ${equipmentName}`)
-    return false
-  }
-  await transporter.sendMail({
+  await sendEmail({
   from: env.mailFrom,
   to: email,
   subject: 'Your EquipTrade India listing has been submitted',
@@ -262,11 +279,7 @@ www.equiptradeindia.com`,
 
 export async function sendListingApprovalEmail(email, name, equipmentName) {
   if (!email) throw new Error('Seller email is missing; approval email was not sent.')
-  if (!transporter) {
-    console.warn(`[development] Approval email for ${email}: ${equipmentName}`)
-    return false
-  }
-  await transporter.sendMail({
+  await sendEmail({
   from: env.mailFrom,
   to: email,
   subject: 'Your EquipTrade India listing is now live',
@@ -531,12 +544,7 @@ www.equiptradeindia.com`,
 
 export async function sendListingRejectionEmail(email, name, equipmentName) {
   if (!email) throw new Error('Seller email is missing; rejection email was not sent.')
-  if (!transporter) {
-    console.warn(`[development] Rejection email for ${email}: ${equipmentName}`)
-    return false
-  }
-
-  await transporter.sendMail({
+  await sendEmail({
     from: env.mailFrom,
     to: email,
     subject: 'Update on your EquipTrade India listing',

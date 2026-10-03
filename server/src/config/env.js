@@ -8,11 +8,9 @@ export const env = {
     process.env.MONGO_URI ||
     'mongodb://127.0.0.1:27017/equiptrade_india',
 
-  mailHost: process.env.MAIL_HOST,
-  mailPort: Number(process.env.MAIL_PORT || 587),
-  mailUser: process.env.MAIL_USER,
-  mailPassword: process.env.MAIL_PASSWORD,
-  mailFrom: process.env.MAIL_FROM || process.env.MAIL_USER,
+  postmarkServerToken: process.env.POSTMARK_SERVER_TOKEN,
+  mailFrom: process.env.MAIL_FROM || '225beitg016@svitvasad.ac.in',
+  mailMessageStream: process.env.MAIL_MESSAGE_STREAM || 'outbound',
 
   adminSessionSecret:
     process.env.ADMIN_SESSION_SECRET ||
