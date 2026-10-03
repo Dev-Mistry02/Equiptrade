@@ -1,4 +1,11 @@
-const API_URL = import.meta.env.VITE_API_URL || '/api'
+const HOSTED_API_URL = 'https://equiptrade-backend.onrender.com/'
+const configuredApiUrl = import.meta.env.VITE_API_URL?.trim()
+const API_URL =
+  configuredApiUrl && configuredApiUrl !== '/api'
+    ? configuredApiUrl
+    : import.meta.env.DEV
+      ? '/api'
+      : HOSTED_API_URL
 
 async function request(path, options = {}) {
   let response
@@ -23,7 +30,11 @@ async function request(path, options = {}) {
     })
   } catch {
     throw new Error(
-      `Unable to connect to the EquipTrade server at ${API_URL}. Start the server with "npm run dev --prefix server".`
+      `Unable to connect to the EquipTrade server at ${API_URL}. ${
+        import.meta.env.DEV
+          ? 'Start the server with "npm run dev --prefix server".'
+          : 'Please try again shortly.'
+      }`
     )
   }
 
