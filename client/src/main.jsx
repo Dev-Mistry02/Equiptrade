@@ -40,8 +40,9 @@ const pathToPage = {
   '/buy': 'browse',
   '/sell': 'sell',
   '/admin': 'admin',
+  '/verification': 'verification',
   '/varification': 'verification',
-  '/contact': 'contact'
+  '/contact': 'contact',
 }
 
 const pageToPath = {
@@ -49,7 +50,27 @@ const pageToPath = {
   browse: '/buy',
   sell: '/sell',
   admin: '/admin',
-  verification: '/varification',
+  verification: '/verification',
+}
+
+function getTokenExpiration(token) {
+  try {
+    const payload = token.split('.')[1]
+    const base64Payload = payload
+      .replace(/-/g, '+')
+      .replace(/_/g, '/')
+      .padEnd(Math.ceil(payload.length / 4) * 4, '=')
+    const claims = JSON.parse(
+      atob(base64Payload)
+    )
+    const expiresAt = Number(claims.exp) * 1000
+
+    return Number.isFinite(expiresAt) && expiresAt > 0
+      ? expiresAt
+      : 0
+  } catch {
+    return 0
+  }
 }
 
 function hasActiveUserSession() {
@@ -57,15 +78,22 @@ function hasActiveUserSession() {
     'equiptrade_user_token'
   )
 
-  const expiresAt = Number(
-    localStorage.getItem(
-      'equiptrade_user_expires_at'
-    )
-  )
-
-  if (!token || !expiresAt) {
+  if (!token) {
     return false
   }
+
+  const expiresAt = getTokenExpiration(token)
+
+  if (!expiresAt) {
+    localStorage.removeItem('equiptrade_user_token')
+    localStorage.removeItem('equiptrade_user_expires_at')
+    localStorage.removeItem('equiptrade_user')
+    return false
+  }
+
+  // Use the signed JWT expiry as the source of truth and repair stale
+  // client-side expiry values written by older API versions.
+  localStorage.setItem('equiptrade_user_expires_at', String(expiresAt))
 
   if (expiresAt <= Date.now()) {
     localStorage.removeItem(
@@ -431,9 +459,24 @@ function App() {
     setOtp('')
 
     try {
-      await api.sendOtp(authData)
+      const response = await api.sendOtp({
+        name: authData.name.trim(),
+        mobileNumber: authData.mobileNumber.trim(),
+        email: authData.email.trim().toLowerCase(),
+      })
+
+      if (response.email && response.email !== authData.email) {
+        setAuthData(current => ({
+          ...current,
+          email: response.email,
+        }))
+      }
       setAuthStep('otp')
-      notify('Verification code sent to your email.')
+      notify(
+        response.email
+          ? `Verification code sent to ${response.email}.`
+          : 'Verification code sent to your email.'
+      )
     } catch (error) {
       setAuthError(
         error.message ||
@@ -460,11 +503,13 @@ function App() {
         throw new Error('Login token was not received from the server.')
       }
 
+      const expiresAt = getTokenExpiration(response.token)
+      if (!expiresAt) {
+        throw new Error('The server returned an invalid login token. Please try again.')
+      }
+
       localStorage.setItem('equiptrade_user_token', response.token)
-      localStorage.setItem(
-        'equiptrade_user_expires_at',
-        String(Date.now() + (response.expiresIn || 30 * 24 * 60 * 60 * 1000))
-      )
+      localStorage.setItem('equiptrade_user_expires_at', String(expiresAt))
       localStorage.setItem('equiptrade_user', JSON.stringify(response.user))
       localStorage.removeItem('equiptrade_auth_draft')
 

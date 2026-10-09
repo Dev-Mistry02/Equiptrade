@@ -50,10 +50,12 @@ async function request(path, options = {}) {
         message: `Server returned HTTP ${response.status}. Restart the API server and try again.`,
       }
 
-  if (
-    response.status === 401 &&
-    !path.startsWith('/admin')
-  ) {
+  const method = (options.method || 'GET').toUpperCase()
+  const requiresUserAuthentication =
+    (method === 'POST' && path === '/equipment') ||
+    (method === 'POST' && /^\/equipment\/[^/]+\/enquiries$/.test(path))
+
+  if (response.status === 401 && requiresUserAuthentication) {
     localStorage.removeItem('equiptrade_user_token')
     localStorage.removeItem('equiptrade_user_expires_at')
     localStorage.removeItem('equiptrade_user')

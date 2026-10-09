@@ -9,8 +9,7 @@ const userSchema = new mongoose.Schema(
 
     mobileNumber: {
       type: String,
-      required: true,
-      unique: true,
+      sparse: true,
       trim: true,
     },
 
@@ -20,6 +19,16 @@ const userSchema = new mongoose.Schema(
       lowercase: true,
       trim: true,
       unique: true,
+    },
+
+    pendingName: {
+      type: String,
+      select: false,
+    },
+
+    pendingMobileNumber: {
+      type: String,
+      select: false,
     },
 
     verified: {
@@ -41,5 +50,7 @@ const userSchema = new mongoose.Schema(
     timestamps: true,
   }
 )
+
+userSchema.set('autoIndex', false)
 
 export default mongoose.model('User', userSchema)

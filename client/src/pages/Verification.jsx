@@ -72,8 +72,8 @@ export default function Verification({
                   <input
                     required
                     value={data.name}
-                    onChange={event => setData({ ...data, name: event.target.value })}
-                    placeholder="e.g. Denish Patel"
+                    onChange={event => setData(current => ({ ...current, name: event.target.value }))}
+                    placeholder="Your full name"
                   />
                 </label>
 
@@ -81,9 +81,10 @@ export default function Verification({
                   Mobile number
                   <input
                     required
+                    type="tel"
                     value={data.mobileNumber}
-                    onChange={event => setData({ ...data, mobileNumber: event.target.value })}
-                    placeholder="+91 0000 000"
+                    onChange={event => setData(current => ({ ...current, mobileNumber: event.target.value }))}
+                    placeholder="Your mobile number"
                   />
                 </label>
 
@@ -93,7 +94,7 @@ export default function Verification({
                     required
                     type="email"
                     value={data.email}
-                    onChange={event => setData({ ...data, email: event.target.value })}
+                    onChange={event => setData(current => ({ ...current, email: event.target.value }))}
                     placeholder="you@company.com"
                   />
                 </label>
@@ -118,7 +119,7 @@ export default function Verification({
                   onClick={onChangeEmail}
                   disabled={loading}
                 >
-                  Change email
+                  Change details
                 </button>
               </div>
 
