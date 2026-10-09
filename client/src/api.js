@@ -1,6 +1,26 @@
 const HOSTED_API_URL = 'https://equiptrade-backend.onrender.com/api'
+const LOCAL_API_URL = 'http://localhost:4000/api'
 const configuredApiUrl = import.meta.env.VITE_API_URL?.trim()
-const baseApiUrl = configuredApiUrl || HOSTED_API_URL
+const isLocalFrontend = ['localhost', '127.0.0.1', '[::1]'].includes(
+  window.location.hostname
+)
+const isLocalApiUrl = url => {
+  if (!url) return false
+
+  try {
+    return ['localhost', '127.0.0.1', '[::1]'].includes(
+      new URL(url, window.location.origin).hostname
+    )
+  } catch {
+    return false
+  }
+}
+const configuredApiIsLocal = isLocalApiUrl(configuredApiUrl)
+const baseApiUrl = isLocalFrontend
+  ? configuredApiUrl || LOCAL_API_URL
+  : configuredApiUrl && !configuredApiIsLocal
+    ? configuredApiUrl
+    : HOSTED_API_URL
 const API_URL =
   baseApiUrl.endsWith('/api')
     ? baseApiUrl.replace(/\/+$/, '')
