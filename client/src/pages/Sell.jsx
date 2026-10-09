@@ -362,8 +362,8 @@ export default function Sell({
 
       notify(
         response.emailSent
-          ? 'Request sent. Check your email for confirmation.'
-          : 'Request sent. Email confirmation is logged in server development mode.'
+          ? 'Request sent. A confirmation email was sent.'
+          : 'Request sent, but the confirmation email could not be sent.'
       )
     } catch (submitError) {
       setError(
@@ -968,7 +968,7 @@ export default function Sell({
                 <ShieldCheck size={19} />
 
                 <span>
-                  Your verified mobile number
+                  Your mobile number
                   will be used for secure buyer
                   enquiries. We never publish
                   personal contact details.

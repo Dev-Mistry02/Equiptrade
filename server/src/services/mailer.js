@@ -1,591 +1,229 @@
-import postmark from 'postmark'
+import nodemailer from 'nodemailer'
 import { env } from '../config/env.js'
 
-const postmarkClient = env.postmarkServerToken
-  ? new postmark.ServerClient(env.postmarkServerToken)
-  : null
-
-async function sendEmail({ from, to, subject, text, html }) {
-  if (!postmarkClient) {
-    throw new Error('POSTMARK_SERVER_TOKEN is not configured; email delivery is unavailable.')
+function getTransporter() {
+  if (!env.smtpHost) {
+    throw new Error('SMTP_HOST is not configured.')
   }
 
-  if (!from) {
-    throw new Error('MAIL_FROM is required when Postmark email delivery is enabled.')
+  if (!Number.isInteger(env.smtpPort) || env.smtpPort < 1 || env.smtpPort > 65535) {
+    throw new Error('SMTP_PORT must be a valid TCP port.')
   }
 
-  const response = await postmarkClient.sendEmail({
-    From: from,
-    To: to,
-    Subject: subject,
-    TextBody: text,
-    HtmlBody: html,
-    MessageStream: env.mailMessageStream,
+  if (!env.mailFrom) {
+    throw new Error('MAIL_FROM is not configured.')
+  }
+
+  if ((env.smtpUser && !env.smtpPassword) || (!env.smtpUser && env.smtpPassword)) {
+    throw new Error('SMTP_USER and SMTP_PASSWORD must both be configured when SMTP authentication is used.')
+  }
+
+  return nodemailer.createTransport({
+    host: env.smtpHost,
+    port: env.smtpPort,
+    secure: env.smtpSecure,
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 30000,
+    ...(env.smtpUser
+      ? { auth: { user: env.smtpUser, pass: env.smtpPassword } }
+      : {}),
   })
-
-  if (!response?.MessageID) {
-    throw new Error('Postmark accepted no message ID; email delivery could not be confirmed.')
-  }
-
-  return true
 }
 
-export async function sendOtpEmail(email, otp) {
-  await sendEmail({
+export async function verifyMailConnection() {
+  await getTransporter().verify()
+}
+
+function escapeHtml(value = '') {
+  return String(value).replace(/[&<>"']/g, character => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  })[character])
+}
+
+async function sendEmail({ to, subject, text, html, replyTo }) {
+  if (!to) {
+    throw new Error('Recipient email address is missing.')
+  }
+
+  const result = await getTransporter().sendMail({
     from: env.mailFrom,
+    to,
+    subject,
+    text,
+    html,
+    ...(replyTo ? { replyTo } : {}),
+  })
+
+  if (!result.messageId) {
+    throw new Error('SMTP server returned no message ID.')
+  }
+
+  return result.messageId
+}
+
+export async function sendOtpEmail(email, name, otp) {
+  const safeName = escapeHtml(name || 'there')
+
+  await sendEmail({
     to: email,
     subject: 'Your EquipTrade India verification code',
-    text: `Your EquipTrade India verification code is ${otp}. It expires in 10 minutes.`,
-    html: `<p>Your EquipTrade India verification code is:</p><h2 style="letter-spacing: 6px">${otp}</h2><p>This code expires in 10 minutes.</p>`
+    text: `Hello ${name || 'there'},\n\nYour EquipTrade India verification code is ${otp}. It expires in 10 minutes. If you did not request this code, you can ignore this email.`,
+    html: `<p>Hello ${safeName},</p><p>Your EquipTrade India verification code is:</p><p style="font-size:28px;font-weight:bold;letter-spacing:8px">${otp}</p><p>This code expires in 10 minutes. If you did not request this code, you can ignore this email.</p>`,
   })
 }
 
 export async function sendListingSubmissionEmail(email, name, equipmentName) {
-  if (!email) throw new Error('Seller email is missing; submission email was not sent.')
+  const safeName = escapeHtml(name || 'Seller')
+  const safeEquipmentName = escapeHtml(equipmentName)
+
+
   await sendEmail({
-  from: env.mailFrom,
-  to: email,
-  subject: 'Your EquipTrade India listing has been submitted',
-  text: `Hello ${name || 'Seller'},
-
-Your equipment listing "${equipmentName}" has been successfully submitted to EquipTrade India and is currently awaiting verification.
-
-Our team will review your listing shortly. Once it has been verified and approved, it will become visible to potential buyers on the platform.
-
-Thank you for choosing EquipTrade India.
-
-Best regards,
-EquipTrade India Team
-www.equiptradeindia.com`,
-
-  html: `
-  <!DOCTYPE html>
-  <html>
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Listing Submitted - EquipTrade India</title>
-    </head>
-
-    <body style="
-      margin: 0;
-      padding: 0;
-      background-color: #f4f6f8;
-      font-family: Arial, Helvetica, sans-serif;
-      color: #1f2937;
-    ">
-
-      <table width="100%" cellpadding="0" cellspacing="0" border="0"
-        style="background-color: #f4f6f8; padding: 40px 15px;">
-        <tr>
-          <td align="center">
-
-            <!-- Main Container -->
-            <table width="100%" cellpadding="0" cellspacing="0" border="0"
-              style="
-                max-width: 600px;
-                background-color: #ffffff;
-                border-radius: 12px;
-                overflow: hidden;
-                box-shadow: 0 4px 18px rgba(0,0,0,0.08);
-              ">
-
-              <!-- Header -->
-              <tr>
-                <td style="
-                  background-color: #111827;
-                  padding: 28px 35px;
-                  text-align: center;
-                ">
-                  <h1 style="
-                    margin: 0;
-                    color: #ffffff;
-                    font-size: 24px;
-                    font-weight: 700;
-                  ">
-                    EquipTrade India
-                  </h1>
-
-                  <p style="
-                    margin: 8px 0 0;
-                    color: #d1d5db;
-                    font-size: 13px;
-                  ">
-                    Buy & Sell Equipment with Confidence
-                  </p>
-                </td>
-              </tr>
-
-              <!-- Content -->
-              <tr>
-                <td style="padding: 40px 35px;">
-
-                  <h2 style="
-                    margin: 0 0 18px;
-                    font-size: 22px;
-                    color: #111827;
-                  ">
-                    Listing Submitted Successfully
-                  </h2>
-
-                  <p style="
-                    margin: 0 0 18px;
-                    font-size: 15px;
-                    line-height: 1.7;
-                    color: #4b5563;
-                  ">
-                    Hello <strong>${name || 'Seller'}</strong>,
-                  </p>
-
-                  <p style="
-                    margin: 0 0 25px;
-                    font-size: 15px;
-                    line-height: 1.7;
-                    color: #4b5563;
-                  ">
-                    Thank you for submitting your equipment listing on
-                    <strong>EquipTrade India</strong>.
-                    Your listing has been successfully received and is
-                    currently awaiting verification by our team.
-                  </p>
-
-                  <!-- Listing Card -->
-                  <table width="100%" cellpadding="0" cellspacing="0" border="0"
-                    style="
-                      background-color: #f9fafb;
-                      border: 1px solid #e5e7eb;
-                      border-radius: 8px;
-                      margin-bottom: 25px;
-                    ">
-                    <tr>
-                      <td style="padding: 20px;">
-
-                        <p style="
-                          margin: 0 0 8px;
-                          font-size: 12px;
-                          color: #6b7280;
-                          text-transform: uppercase;
-                          letter-spacing: 0.5px;
-                          font-weight: 600;
-                        ">
-                          Equipment Listing
-                        </p>
-
-                        <p style="
-                          margin: 0;
-                          font-size: 17px;
-                          font-weight: 700;
-                          color: #111827;
-                        ">
-                          ${equipmentName}
-                        </p>
-
-                        <p style="
-                          margin: 12px 0 0;
-                          font-size: 13px;
-                          color: #d97706;
-                          font-weight: 600;
-                        ">
-                          ● Awaiting Verification
-                        </p>
-
-                      </td>
-                    </tr>
-                  </table>
-
-                  <p style="
-                    margin: 0 0 18px;
-                    font-size: 14px;
-                    line-height: 1.7;
-                    color: #4b5563;
-                  ">
-                    Our team will review the details of your listing shortly.
-                    Once it has been verified and approved, your equipment
-                    will be made visible to potential buyers on the platform.
-                  </p>
-
-                  <p style="
-                    margin: 0;
-                    font-size: 14px;
-                    line-height: 1.7;
-                    color: #4b5563;
-                  ">
-                    We appreciate your trust in
-                    <strong>EquipTrade India</strong>.
-                  </p>
-
-                </td>
-              </tr>
-
-              <!-- Divider -->
-              <tr>
-                <td style="padding: 0 35px;">
-                  <div style="
-                    height: 1px;
-                    background-color: #e5e7eb;
-                  "></div>
-                </td>
-              </tr>
-
-              <!-- Footer -->
-              <tr>
-                <td style="
-                  padding: 25px 35px;
-                  text-align: center;
-                  background-color: #fafafa;
-                ">
-
-                  <p style="
-                    margin: 0 0 8px;
-                    font-size: 14px;
-                    font-weight: 700;
-                    color: #111827;
-                  ">
-                    EquipTrade India
-                  </p>
-
-                  <p style="
-                    margin: 0 0 12px;
-                    font-size: 12px;
-                    color: #6b7280;
-                    line-height: 1.6;
-                  ">
-                    Your trusted platform for buying and selling equipment.
-                  </p>
-
-                  <p style="
-                    margin: 0;
-                    font-size: 12px;
-                    color: #9ca3af;
-                  ">
-                    © ${new Date().getFullYear()} EquipTrade India. All rights reserved.
-                  </p>
-
-                </td>
-              </tr>
-
-            </table>
-
-          </td>
-        </tr>
-      </table>
-
-    </body>
-  </html>
-  `
-});
-  return true
-}
-
-export async function sendListingApprovalEmail(email, name, equipmentName) {
-  if (!email) throw new Error('Seller email is missing; approval email was not sent.')
-  await sendEmail({
-  from: env.mailFrom,
-  to: email,
-  subject: 'Your EquipTrade India listing is now live',
-  
-  text: `Hello ${name || 'Seller'},
-
-Great news! Your equipment listing "${equipmentName}" has been successfully verified and approved by EquipTrade India.
-
-Your listing is now live and visible to potential buyers on the platform.
-
-Thank you for choosing EquipTrade India.
-
-Best regards,
-EquipTrade India Team
-www.equiptradeindia.com`,
-
-  html: `
-  <!DOCTYPE html>
-  <html>
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Listing Approved - EquipTrade India</title>
-    </head>
-
-    <body style="
-      margin: 0;
-      padding: 0;
-      background-color: #f4f6f8;
-      font-family: Arial, Helvetica, sans-serif;
-      color: #1f2937;
-    ">
-
-      <table width="100%" cellpadding="0" cellspacing="0" border="0"
-        style="background-color: #f4f6f8; padding: 40px 15px;">
-        <tr>
-          <td align="center">
-
-            <!-- Main Container -->
-            <table width="100%" cellpadding="0" cellspacing="0" border="0"
-              style="
-                max-width: 600px;
-                background-color: #ffffff;
-                border-radius: 12px;
-                overflow: hidden;
-                box-shadow: 0 4px 18px rgba(0,0,0,0.08);
-              ">
-
-              <!-- Header -->
-              <tr>
-                <td style="
-                  background-color: #111827;
-                  padding: 28px 35px;
-                  text-align: center;
-                ">
-
-                  <h1 style="
-                    margin: 0;
-                    color: #ffffff;
-                    font-size: 24px;
-                    font-weight: 700;
-                  ">
-                    EquipTrade India
-                  </h1>
-
-                  <p style="
-                    margin: 8px 0 0;
-                    color: #d1d5db;
-                    font-size: 13px;
-                  ">
-                    Buy & Sell Equipment with Confidence
-                  </p>
-
-                </td>
-              </tr>
-
-              <!-- Content -->
-              <tr>
-                <td style="padding: 40px 35px;">
-
-                  <!-- Success Icon -->
-                  <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                    <tr>
-                      <td align="center" style="padding-bottom: 20px;">
-
-                        <div style="
-                          width: 58px;
-                          height: 58px;
-                          line-height: 58px;
-                          border-radius: 50%;
-                          background-color: #dcfce7;
-                          color: #16a34a;
-                          font-size: 30px;
-                          font-weight: bold;
-                          margin: 0 auto;
-                        ">
-                          ✓
-                        </div>
-
-                      </td>
-                    </tr>
-                  </table>
-
-                  <h2 style="
-                    margin: 0 0 18px;
-                    text-align: center;
-                    font-size: 23px;
-                    color: #111827;
-                  ">
-                    Your Listing Is Approved!
-                  </h2>
-
-                  <p style="
-                    margin: 0 0 18px;
-                    font-size: 15px;
-                    line-height: 1.7;
-                    color: #4b5563;
-                  ">
-                    Hello <strong>${name || 'Seller'}</strong>,
-                  </p>
-
-                  <p style="
-                    margin: 0 0 25px;
-                    font-size: 15px;
-                    line-height: 1.7;
-                    color: #4b5563;
-                  ">
-                    Great news! Your equipment listing has been successfully
-                    reviewed and approved by the
-                    <strong>EquipTrade India</strong> team.
-                  </p>
-
-                  <!-- Listing Card -->
-                  <table width="100%" cellpadding="0" cellspacing="0" border="0"
-                    style="
-                      background-color: #f9fafb;
-                      border: 1px solid #e5e7eb;
-                      border-radius: 8px;
-                      margin-bottom: 25px;
-                    ">
-                    <tr>
-                      <td style="padding: 20px;">
-
-                        <p style="
-                          margin: 0 0 8px;
-                          font-size: 12px;
-                          color: #6b7280;
-                          text-transform: uppercase;
-                          letter-spacing: 0.5px;
-                          font-weight: 600;
-                        ">
-                          Equipment Listing
-                        </p>
-
-                        <p style="
-                          margin: 0 0 12px;
-                          font-size: 17px;
-                          font-weight: 700;
-                          color: #111827;
-                        ">
-                          ${equipmentName}
-                        </p>
-
-                        <p style="
-                          margin: 0;
-                          font-size: 13px;
-                          color: #16a34a;
-                          font-weight: 700;
-                        ">
-                          ✓ Approved & Live
-                        </p>
-
-                      </td>
-                    </tr>
-                  </table>
-
-                  <p style="
-                    margin: 0 0 18px;
-                    font-size: 14px;
-                    line-height: 1.7;
-                    color: #4b5563;
-                  ">
-                    Your listing is now <strong>live on EquipTrade India</strong>
-                    and can be viewed by potential buyers looking for
-                    equipment on our platform.
-                  </p>
-
-                  <p style="
-                    margin: 0;
-                    font-size: 14px;
-                    line-height: 1.7;
-                    color: #4b5563;
-                  ">
-                    Thank you for choosing
-                    <strong>EquipTrade India</strong> to sell your equipment.
-                    We wish you a successful sale!
-                  </p>
-
-                </td>
-              </tr>
-
-              <!-- Divider -->
-              <tr>
-                <td style="padding: 0 35px;">
-                  <div style="
-                    height: 1px;
-                    background-color: #e5e7eb;
-                  "></div>
-                </td>
-              </tr>
-
-              <!-- Footer -->
-              <tr>
-                <td style="
-                  padding: 25px 35px;
-                  text-align: center;
-                  background-color: #fafafa;
-                ">
-
-                  <p style="
-                    margin: 0 0 8px;
-                    font-size: 14px;
-                    font-weight: 700;
-                    color: #111827;
-                  ">
-                    EquipTrade India
-                  </p>
-
-                  <p style="
-                    margin: 0 0 12px;
-                    font-size: 12px;
-                    color: #6b7280;
-                    line-height: 1.6;
-                  ">
-                    Your trusted platform for buying and selling equipment.
-                  </p>
-
-                  <p style="
-                    margin: 0;
-                    font-size: 12px;
-                    color: #9ca3af;
-                  ">
-                    © ${new Date().getFullYear()} EquipTrade India.
-                    All rights reserved.
-                  </p>
-
-                </td>
-              </tr>
-
-            </table>
-
-          </td>
-        </tr>
-      </table>
-
-    </body>
-  </html>
-  `
-});
-  return true
-}
-
-export async function sendListingRejectionEmail(email, name, equipmentName) {
-  if (!email) throw new Error('Seller email is missing; rejection email was not sent.')
-  await sendEmail({
-    from: env.mailFrom,
     to: email,
-    subject: 'Update on your EquipTrade India listing',
-    text: `Hello ${name || 'Seller'},
+    subject: "Listing Received — EquipTrade India",
 
-Thank you for submitting "${equipmentName}" to EquipTrade India.
+    text: `Hello ${name || "Seller"},
 
-After review, our team was unable to approve this listing for publication at this time. The listing will not be visible to buyers on the platform.
+Your equipment listing "${equipmentName}" has been successfully submitted to EquipTrade India.
 
-If you believe this decision was made in error or would like guidance on updating the listing, please contact our support team.
+Status: Pending Review
+
+Our team will review your listing. We'll send you an email once the review is complete.
+
+Thank you for choosing EquipTrade India.
 
 Best regards,
-EquipTrade India Team
-www.equiptradeindia.com`,
-    html: `
-      <div style="margin:0;padding:32px 16px;background:#f4f6f8;font-family:Arial,Helvetica,sans-serif;color:#1f2937">
-        <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 18px rgba(0,0,0,.08)">
-          <div style="padding:28px 35px;background:#111827;color:#fff">
-            <div style="font-size:20px;font-weight:700">EquipTrade <span style="color:#f3c760">India</span></div>
-            <div style="margin-top:8px;color:#cbd5e1;font-size:13px">Listing review update</div>
-          </div>
-          <div style="padding:32px 35px">
-            <p style="margin:0 0 16px;font-size:16px">Hello ${name || 'Seller'},</p>
-            <p style="margin:0 0 18px;color:#4b5563;font-size:15px;line-height:1.7">
-              Thank you for submitting <strong>${equipmentName}</strong> to EquipTrade India.
-            </p>
-            <p style="margin:0 0 18px;color:#4b5563;font-size:15px;line-height:1.7">
-              After review, our team was unable to approve this listing for publication at this time. The listing will not be visible to buyers on the platform.
-            </p>
-            <p style="margin:0;color:#4b5563;font-size:15px;line-height:1.7">
-              If you believe this decision was made in error or would like guidance on updating the listing, please contact our support team.
-            </p>
-          </div>
-          <div style="padding:22px 35px;border-top:1px solid #e5e7eb;color:#6b7280;font-size:12px;line-height:1.6">
-            EquipTrade India<br />
-            Your trusted platform for buying and selling equipment.
-          </div>
-        </div>
-      </div>
-    `
-  })
+Team EquipTrade India`,
 
-  return true
+    html: `
+    <div style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;color:#111827;">
+      <div style="max-width:600px;margin:0 auto;padding:32px 16px;">
+
+        <div style="background:#111827;padding:24px 30px;border-radius:14px 14px 0 0;">
+          <h1 style="margin:0;color:#ffffff;font-size:24px;letter-spacing:-0.5px;">
+            EquipTrade <span style="color:#f59e0b;">India</span>
+          </h1>
+          <p style="margin:8px 0 0;color:#9ca3af;font-size:13px;">
+            Your equipment marketplace
+          </p>
+        </div>
+
+        <div style="background:#ffffff;padding:32px 30px;border:1px solid #e5e7eb;border-top:none;">
+
+          <div style="font-size:34px;margin-bottom:18px;">&#10003;</div>
+
+          <h2 style="margin:0 0 14px;font-size:24px;color:#111827;">
+            Listing submitted successfully!
+          </h2>
+
+          <p style="margin:0 0 20px;font-size:15px;line-height:1.8;color:#4b5563;">
+            Hello ${safeName},<br><br>
+            Thank you for listing your equipment with EquipTrade India.
+            We've received your submission and it's now waiting for review.
+          </p>
+
+          <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:18px;margin:22px 0;">
+            <p style="margin:0 0 8px;font-size:12px;font-weight:bold;color:#92400e;text-transform:uppercase;letter-spacing:1px;">
+              Equipment submitted
+            </p>
+            <p style="margin:0 0 14px;font-size:17px;font-weight:bold;color:#111827;">
+              ${safeEquipmentName}
+            </p>
+            <span style="display:inline-block;background:#fef3c7;color:#92400e;padding:7px 12px;border-radius:20px;font-size:12px;font-weight:bold;">
+              &#9679; Pending Review
+            </span>
+          </div>
+
+          <p style="margin:20px 0;font-size:14px;line-height:1.8;color:#4b5563;">
+            Our team will review your listing to ensure the details are accurate.
+            We'll email you when the review is complete.
+          </p>
+
+          <div style="height:1px;background:#e5e7eb;margin:26px 0;"></div>
+
+          <p style="margin:0;font-size:14px;line-height:1.7;color:#4b5563;">
+            Thank you for choosing <strong style="color:#111827;">EquipTrade India</strong>.
+            We appreciate your trust in our marketplace.
+          </p>
+
+          <p style="margin:22px 0 0;font-size:14px;color:#111827;">
+            Best regards,<br>
+            <strong>Team EquipTrade India</strong>
+          </p>
+        </div>
+
+        <div style="padding:20px 16px;text-align:center;">
+          <p style="margin:0 0 8px;font-size:12px;color:#6b7280;">
+            Connecting buyers and sellers of equipment.
+          </p>
+          <p style="margin:0;font-size:11px;color:#9ca3af;">
+            This is an automated email. Please do not reply directly.
+          </p>
+        </div>
+
+      </div>
+    </div>
+  `,
+  });
+}
+
+export async function sendBuyerEnquiryEmails({
+  sellerEmail,
+  buyerEmail,
+  buyerName,
+  buyerMobileNumber,
+  message,
+  equipmentName,
+}) {
+  const safeBuyerName = escapeHtml(buyerName)
+  const safeBuyerMobileNumber = escapeHtml(buyerMobileNumber)
+  const safeMessage = escapeHtml(message).replace(/\n/g, '<br>')
+  const safeEquipmentName = escapeHtml(equipmentName)
+
+  const [sellerResult, buyerResult] = await Promise.allSettled([
+    sendEmail({
+      to: sellerEmail,
+      replyTo: buyerEmail,
+      subject: `Buyer enquiry: ${equipmentName}`,
+      text: `You received an enquiry about "${equipmentName}".\n\nFrom: ${buyerName}\nEmail: ${buyerEmail}\nMobile: ${buyerMobileNumber}\n\nMessage:\n${message}`,
+      html: `<p>You received an enquiry about <strong>${safeEquipmentName}</strong>.</p><p><strong>From:</strong> ${safeBuyerName}<br><strong>Email:</strong> ${escapeHtml(buyerEmail)}<br><strong>Mobile:</strong> ${safeBuyerMobileNumber}</p><p><strong>Message:</strong><br>${safeMessage}</p><p>Reply directly to this email to contact the buyer.</p>`,
+    }),
+    sendEmail({
+      to: buyerEmail,
+      subject: `Your enquiry for ${equipmentName}`,
+      text: `Hello ${buyerName},\n\nYour enquiry for "${equipmentName}" was sent to the seller. They can reply directly to this email.\n\nYour message:\n${message}`,
+      html: `<p>Hello ${safeBuyerName},</p><p>Your enquiry for <strong>${safeEquipmentName}</strong> was sent to the seller. They can reply directly to this email.</p><p><strong>Your message:</strong><br>${safeMessage}</p>`,
+    }),
+  ])
+
+  return {
+    sellerEmailSent: sellerResult.status === 'fulfilled',
+    buyerConfirmationSent: buyerResult.status === 'fulfilled',
+    sellerError: sellerResult.status === 'rejected' ? sellerResult.reason : null,
+    buyerError: buyerResult.status === 'rejected' ? buyerResult.reason : null,
+  }
+}
+
+export async function sendListingStatusEmail(email, name, equipmentName, status) {
+  const approved = status === 'approved'
+  const safeName = escapeHtml(name || 'Seller')
+  const safeEquipmentName = escapeHtml(equipmentName)
+  const update = approved
+    ? `Your equipment listing "${equipmentName}" has been reviewed and approved. It is now live on EquipTrade India.`
+    : `Your equipment listing "${equipmentName}" was reviewed and could not be approved at this time. Please contact EquipTrade India support if you need help.`
+
+  await sendEmail({
+    to: email,
+    subject: approved
+      ? 'Your EquipTrade India listing is approved'
+      : 'Update on your EquipTrade India listing',
+    text: `Hello ${name || 'Seller'},\n\n${update}\n\nEquipTrade India`,
+    html: `<p>Hello ${safeName},</p><p>${approved
+      ? `Your equipment listing <strong>${safeEquipmentName}</strong> has been reviewed and approved. It is now live on EquipTrade India.`
+      : `Your equipment listing <strong>${safeEquipmentName}</strong> was reviewed and could not be approved at this time. Please contact EquipTrade India support if you need help.`}</p><p>EquipTrade India</p>`,
+  })
 }

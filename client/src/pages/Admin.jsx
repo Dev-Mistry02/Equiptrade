@@ -161,19 +161,15 @@ export default function Admin({ notify }) {
         )
       )
 
-      if (status === 'approved') {
-        notify(
-          updated?.emailSent
-            ? 'Approved and confirmation email sent'
-            : 'Listing approved successfully'
-        )
-      } else {
-        notify(
-          updated?.emailSent
-            ? 'Rejected and notification email sent'
-            : 'Listing rejected successfully'
-        )
-      }
+      notify(
+        updated?.emailSent
+          ? status === 'approved'
+            ? 'Listing approved and seller emailed'
+            : 'Listing rejected and seller emailed'
+          : status === 'approved'
+            ? 'Listing approved, but seller email was not sent'
+            : 'Listing rejected, but seller email was not sent'
+      )
     } catch (requestError) {
       console.error(
         'Failed to update submission:',

@@ -6,11 +6,17 @@ export const env = {
 
   mongoUri:
     process.env.MONGO_URI ||
-    'mongodb://127.0.0.1:27017/equiptrade_india',
+    'mongodb://127.0.0.1:27017/equiptrade',
 
-  postmarkServerToken: process.env.POSTMARK_SERVER_TOKEN,
-  mailFrom: process.env.MAIL_FROM || '225beitg016@svitvasad.ac.in',
-  mailMessageStream: process.env.MAIL_MESSAGE_STREAM || 'outbound',
+  smtpHost: process.env.SMTP_HOST,
+  smtpPort: Number(process.env.SMTP_PORT || 587),
+  smtpSecure: process.env.SMTP_SECURE === 'true',
+  smtpUser: process.env.SMTP_USER,
+  smtpPassword:
+    process.env.SMTP_HOST === 'smtp.gmail.com'
+      ? process.env.SMTP_PASSWORD?.replace(/\s/g, '')
+      : process.env.SMTP_PASSWORD,
+  mailFrom: process.env.MAIL_FROM,
 
   adminSessionSecret:
     process.env.ADMIN_SESSION_SECRET ||

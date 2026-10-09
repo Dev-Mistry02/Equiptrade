@@ -20,7 +20,7 @@ export function requireUser(req, res, next) {
     next()
   } catch {
     return res.status(401).json({
-      message: 'Your session has expired. Please verify your OTP again.',
+      message: 'Your session has expired. Please sign in again.',
     })
   }
 }

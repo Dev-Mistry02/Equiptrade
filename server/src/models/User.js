@@ -19,6 +19,7 @@ const userSchema = new mongoose.Schema(
       required: true,
       lowercase: true,
       trim: true,
+      unique: true,
     },
 
     verified: {

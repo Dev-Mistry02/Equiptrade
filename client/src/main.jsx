@@ -11,7 +11,6 @@ import {
   Heart,
   House,
   LockKeyhole,
-  Mail,
   Menu,
   Search,
   ShieldCheck,
@@ -141,10 +140,7 @@ function App() {
 
       return draft?.data?.email
         ? {
-          step:
-            draft.step === 'otp'
-              ? 'otp'
-              : 'details',
+          step: draft.step === 'otp' ? 'otp' : 'details',
           data: draft.data,
         }
         : {
@@ -200,9 +196,7 @@ function App() {
     useState(false)
   const [pendingPage, setPendingPage] = useState(null)
   const [pendingAction, setPendingAction] = useState(null)
-  const [authStep, setAuthStep] = useState(
-    savedAuthDraft.step
-  )
+  const [authStep, setAuthStep] = useState(savedAuthDraft.step)
   const [authData, setAuthData] = useState(
     savedAuthDraft.data
   )
@@ -227,49 +221,32 @@ function App() {
       )
     }
   }, [
-    authData,
     authStep,
+    authData,
     verified,
   ])
 
   useEffect(() => {
     const restoreVerificationStep = () => {
-      if (hasActiveUserSession()) {
-        return
-      }
+      if (hasActiveUserSession()) return
 
       try {
         const draft = JSON.parse(
-          localStorage.getItem(
-            'equiptrade_auth_draft'
-          ) || 'null'
+          localStorage.getItem('equiptrade_auth_draft') || 'null'
         )
 
-        if (
-          draft?.step === 'otp' &&
-          draft.data?.email
-        ) {
+        if (draft?.step === 'otp' && draft.data?.email) {
           setAuthData(draft.data)
           setAuthStep('otp')
           setOtp('')
         }
       } catch {
-        localStorage.removeItem(
-          'equiptrade_auth_draft'
-        )
+        localStorage.removeItem('equiptrade_auth_draft')
       }
     }
 
-    window.addEventListener(
-      'popstate',
-      restoreVerificationStep
-    )
-
-    return () =>
-      window.removeEventListener(
-        'popstate',
-        restoreVerificationStep
-      )
+    window.addEventListener('popstate', restoreVerificationStep)
+    return () => window.removeEventListener('popstate', restoreVerificationStep)
   }, [])
 
   useEffect(() => {
@@ -452,14 +429,11 @@ function App() {
     setLoading(true)
     setAuthError('')
     setOtp('')
-    setAuthStep('otp')
 
     try {
       await api.sendOtp(authData)
-
-      notify(
-        'Verification code sent to your email'
-      )
+      setAuthStep('otp')
+      notify('Verification code sent to your email.')
     } catch (error) {
       setAuthError(
         error.message ||
@@ -477,42 +451,22 @@ function App() {
     setAuthError('')
 
     try {
-      const response =
-        await api.verifyOtp({
-          email: authData.email,
-          otp,
-        })
+      const response = await api.verifyOtp({
+        email: authData.email,
+        otp,
+      })
 
       if (!response?.token) {
-        throw new Error(
-          'Login token was not received from the server.'
-        )
+        throw new Error('Login token was not received from the server.')
       }
 
-      localStorage.setItem(
-        'equiptrade_user_token',
-        response.token
-      )
-
+      localStorage.setItem('equiptrade_user_token', response.token)
       localStorage.setItem(
         'equiptrade_user_expires_at',
-        String(
-          Date.now() +
-          (
-            response.expiresIn ||
-            30 * 24 * 60 * 60 * 1000
-          )
-        )
+        String(Date.now() + (response.expiresIn || 30 * 24 * 60 * 60 * 1000))
       )
-
-      localStorage.setItem(
-        'equiptrade_user',
-        JSON.stringify(response.user)
-      )
-
-      localStorage.removeItem(
-        'equiptrade_auth_draft'
-      )
+      localStorage.setItem('equiptrade_user', JSON.stringify(response.user))
+      localStorage.removeItem('equiptrade_auth_draft')
 
       setVerified(true)
       setVerificationOpen(false)
@@ -520,7 +474,6 @@ function App() {
       const destination = pendingPage
       const destinationOptions = pendingPageOptions
       const action = pendingAction
-
       setPendingPage(null)
       setPendingPageOptions(null)
       setPendingAction(null)
@@ -528,18 +481,11 @@ function App() {
       if (destination) {
         navigate(destination, destinationOptions || {})
       } else if (action) {
-        window.history.replaceState(
-          {},
-          '',
-          pageToPath.home
-        )
-
+        window.history.replaceState({}, '', pageToPath.home)
         action()
       }
 
-      notify(
-        'Account verified. Welcome to EquipTrade.'
-      )
+      notify('Account verified. Welcome to EquipTrade.')
     } catch (error) {
       setAuthError(
         error.message ||
@@ -883,7 +829,7 @@ function App() {
 
         <div className="top-actions">
 
-          <button
+          {/* <button
             className="icon-btn"
             aria-label="Notifications"
             onClick={() =>
@@ -893,7 +839,7 @@ function App() {
             }
           >
             <Bell size={18} />
-          </button>
+          </button> */}
 
           <div className="profile-menu">
 
@@ -2184,7 +2130,7 @@ function LegacySell({
                 <ShieldCheck size={19} />
 
                 <span>
-                  Your verified mobile number
+                  Your mobile number
                   will be used for secure buyer
                   enquiries. We never publish
                   personal contact details.
@@ -2417,246 +2363,6 @@ function LegacyAdmin({
           </tbody>
 
         </table>
-      </div>
-    </main>
-  )
-}
-
-function LegacyVerificationPage({
-  step,
-  data,
-  setData,
-  otp,
-  setOtp,
-  onSend,
-  onVerify,
-  loading,
-  error,
-}) {
-  return (
-    <main className="verification-page">
-      <div className="verification-layout">
-
-        <div className="verification-intro">
-
-          <div className="auth-brand">
-            <span className="brand-mark">
-              <Wrench size={17} />
-            </span>
-
-            equip<span>trade</span>
-          </div>
-
-          <span className="eyebrow">
-            Welcome to the network
-          </span>
-
-          <h1>
-            Trade with
-            <br />
-            <em>
-              confidence.
-            </em>
-          </h1>
-
-          <p>
-            Verify your identity once to
-            access India's trusted equipment
-            marketplace. Your details stay
-            private and secure.
-          </p>
-
-          <div className="verification-points">
-
-            <span>
-              <ShieldCheck size={17} />
-              Verified marketplace access
-            </span>
-
-            <span>
-              <BadgeCheck size={17} />
-              Secure buyer enquiries
-            </span>
-
-            <span>
-              <Building2 size={17} />
-              Built for Indian businesses
-            </span>
-
-          </div>
-
-        </div>
-
-        <section className="verification-card">
-
-          {step === 'details' ? (
-            <>
-              <span className="eyebrow">
-                Step 1 of 2
-              </span>
-
-              <h2>
-                Tell us about yourself.
-              </h2>
-
-              <p>
-                We’ll send a one-time code to
-                verify your account.
-              </p>
-
-              <form onSubmit={onSend}>
-
-                <label>
-                  Your name
-
-                  <input
-                    required
-                    value={data.name}
-                    onChange={e =>
-                      setData({
-                        ...data,
-                        name: e.target.value,
-                      })
-                    }
-                    placeholder="e.g. Priya Sharma"
-                  />
-                </label>
-
-                <label>
-                  Mobile number
-
-                  <input
-                    required
-                    value={
-                      data.mobileNumber
-                    }
-                    onChange={e =>
-                      setData({
-                        ...data,
-                        mobileNumber:
-                          e.target.value,
-                      })
-                    }
-                    placeholder="+91 98765 43210"
-                  />
-                </label>
-
-                <label>
-                  Email address
-
-                  <input
-                    required
-                    type="email"
-                    value={data.email}
-                    onChange={e =>
-                      setData({
-                        ...data,
-                        email:
-                          e.target.value,
-                      })
-                    }
-                    placeholder="you@company.com"
-                  />
-                </label>
-
-                {error && (
-                  <p
-                    className="verification-error"
-                    role="alert"
-                  >
-                    {error}
-                  </p>
-                )}
-
-                <button
-                  className="button button-dark full-button"
-                  disabled={loading}
-                >
-                  {loading
-                    ? 'Sending code...'
-                    : 'Send verification code'}
-
-                  <ArrowRight size={17} />
-                </button>
-
-              </form>
-            </>
-          ) : (
-            <>
-              <div className="otp-icon">
-                <Mail size={23} />
-              </div>
-
-              <span className="eyebrow">
-                Step 2 of 2
-              </span>
-
-              <h2>
-                Enter your code.
-              </h2>
-
-              <p>
-                We sent a 6-digit code to{' '}
-                <strong>
-                  {data.email}
-                </strong>.
-              </p>
-
-              <form onSubmit={onVerify}>
-
-                <input
-                  className="otp-input"
-                  inputMode="numeric"
-                  maxLength={6}
-                  required
-                  value={otp}
-                  onChange={e =>
-                    setOtp(
-                      e.target.value.replace(
-                        /\D/g,
-                        ''
-                      )
-                    )
-                  }
-                  placeholder="000000"
-                  autoFocus
-                />
-
-                {error && (
-                  <p
-                    className="verification-error"
-                    role="alert"
-                  >
-                    {error}
-                  </p>
-                )}
-
-                <button
-                  className="button button-dark full-button"
-                  disabled={loading}
-                >
-                  {loading
-                    ? 'Verifying...'
-                    : 'Verify & continue'}
-
-                  <BadgeCheck size={17} />
-                </button>
-
-              </form>
-
-              <button
-                className="resend"
-                onClick={onSend}
-              >
-                Didn’t receive it?{' '}
-                <strong>
-                  Resend code
-                </strong>
-              </button>
-            </>
-          )}
-
-        </section>
       </div>
     </main>
   )
@@ -2964,8 +2670,13 @@ function Metric({
   )
 }
 
-createRoot(
-  document.getElementById('root')
-).render(
-  <App />
-)
+const rootElement = document.getElementById('root')
+const root = import.meta.hot?.data.root || createRoot(rootElement)
+
+if (import.meta.hot) {
+  import.meta.hot.dispose(data => {
+    data.root = root
+  })
+}
+
+root.render(<App />)

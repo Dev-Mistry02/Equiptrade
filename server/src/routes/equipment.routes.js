@@ -1,9 +1,11 @@
 import { Router } from 'express'
 import Equipment from '../models/Equipment.js'
-import User from '../models/User.js'
 import mongoose from 'mongoose'
-import { sendListingSubmissionEmail } from '../services/mailer.js'
 import { requireUser } from '../middleware/userAuth.js'
+import {
+  sendBuyerEnquiryEmails,
+  sendListingSubmissionEmail,
+} from '../services/mailer.js'
 
 const router = Router()
 
@@ -64,6 +66,77 @@ router.get('/', async (req, res) => {
   } catch (error) {
     res.status(500).json({
       message: error.message,
+    })
+  }
+})
+
+router.post('/:id/enquiries', requireUser, async (req, res) => {
+  try {
+    const { id } = req.params
+    const name = String(req.body.name || '').trim()
+    const email = String(req.user.email || '').trim().toLowerCase()
+    const mobileNumber = String(req.body.mobileNumber || '').trim()
+    const message = String(req.body.message || '').trim()
+
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ message: 'Invalid listing id.' })
+    }
+
+    if (
+      !name ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
+      !mobileNumber ||
+      !message ||
+      message.length > 5000
+    ) {
+      return res.status(400).json({
+        message: 'Enter a valid name, email, mobile number and message (up to 5000 characters).',
+      })
+    }
+
+    const listing = await Equipment.findOne({
+      _id: id,
+      status: { $in: ['approved', 'published'] },
+    }).populate('seller', 'name email')
+
+    if (!listing) {
+      return res.status(404).json({ message: 'Equipment listing not found.' })
+    }
+
+    if (!listing.seller?.email) {
+      return res.status(409).json({
+        message: 'The seller has no email address available for enquiries.',
+      })
+    }
+
+    const emailResults = await sendBuyerEnquiryEmails({
+      sellerEmail: listing.seller.email,
+      buyerEmail: email,
+      buyerName: name,
+      buyerMobileNumber: mobileNumber,
+      message,
+      equipmentName: listing.name,
+    })
+
+    if (!emailResults.sellerEmailSent) {
+      console.error('Failed to email buyer enquiry to seller:', emailResults.sellerError)
+      return res.status(502).json({
+        message: 'Your enquiry could not be delivered to the seller. Please try again.',
+      })
+    }
+
+    if (!emailResults.buyerConfirmationSent) {
+      console.error('Failed to send buyer enquiry confirmation:', emailResults.buyerError)
+    }
+
+    res.status(200).json({
+      message: 'Your enquiry was sent to the seller.',
+      confirmationEmailSent: emailResults.buyerConfirmationSent,
+    })
+  } catch (error) {
+    console.error('Failed to send buyer enquiry:', error)
+    res.status(502).json({
+      message: 'Your enquiry could not be emailed. Please check the mail configuration and try again.',
     })
   }
 })
@@ -140,13 +213,21 @@ router.post('/', requireUser, async (req, res) => {
 
     const listing = await Equipment.create(listingData)
 
-    const seller = await User.findById(listing.seller).select('name email')
+    const seller = await listing.populate('seller', 'name email')
+    let emailSent = false
 
-    const emailSent = await sendListingSubmissionEmail(
-      seller?.email,
-      seller?.name,
-      listing.name
-    )
+    if (seller.seller?.email) {
+      try {
+        await sendListingSubmissionEmail(
+          seller.seller.email,
+          seller.seller.name,
+          listing.name
+        )
+        emailSent = true
+      } catch (error) {
+        console.error('Failed to email listing submission confirmation:', error)
+      }
+    }
 
     res.status(201).json({
       ...listing.toObject(),

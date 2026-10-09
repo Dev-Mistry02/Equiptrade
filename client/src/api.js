@@ -1,12 +1,10 @@
 const HOSTED_API_URL = 'https://equiptrade-backend.onrender.com/api'
 const configuredApiUrl = import.meta.env.VITE_API_URL?.trim()
-const baseApiUrl =
-  configuredApiUrl || (import.meta.env.DEV ? '/api' : HOSTED_API_URL)
+const baseApiUrl = configuredApiUrl || HOSTED_API_URL
 const API_URL =
-  baseApiUrl === '/api' || baseApiUrl.endsWith('/api')
+  baseApiUrl.endsWith('/api')
     ? baseApiUrl.replace(/\/+$/, '')
     : `${baseApiUrl.replace(/\/+$/, '')}/api`
-const isLocalApi = API_URL === '/api'
 
 async function request(path, options = {}) {
   let response
@@ -28,14 +26,18 @@ async function request(path, options = {}) {
       ...options,
       headers,
       cache: 'no-store',
+      signal: options.signal || AbortSignal.timeout(15000),
     })
   } catch (error) {
+    if (error.name === 'TimeoutError' || error.name === 'AbortError') {
+      throw new Error(
+        'The EquipTrade server did not respond in time. Check the server and database connection, then try again.',
+        { cause: error }
+      )
+    }
+
     throw new Error(
-      `Unable to connect to the EquipTrade server at ${API_URL}. ${
-        isLocalApi
-          ? 'Start the server with "npm run dev --prefix server".'
-          : 'Please try again shortly.'
-      }`,
+      `Unable to connect to the EquipTrade server at ${API_URL}. Please try again shortly.`,
       { cause: error }
     )
   }
@@ -149,6 +151,12 @@ export const api = {
 
   submitEquipment: payload =>
     request('/equipment', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  sendEnquiry: (id, payload) =>
+    request(`/equipment/${encodeURIComponent(id)}/enquiries`, {
       method: 'POST',
       body: JSON.stringify(payload),
     }),

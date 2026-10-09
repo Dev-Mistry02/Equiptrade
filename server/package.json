@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
+    "check-mail": "node src/scripts/check-mail.js",
     "create-admin": "node src/scripts/create-admin.js"
   },
   "dependencies": {
@@ -14,6 +15,6 @@
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^8.9.5",
-    "postmark": "^4.0.2"
+    "nodemailer": "^6.10.1"
   }
 }

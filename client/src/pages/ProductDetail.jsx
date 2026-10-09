@@ -77,6 +77,7 @@ export default function ProductDetail({
   const [allListings, setAllListings] = useState([])
   const [enquiryModal, setEnquiryModal] = useState(false)
   const [enquirySending, setEnquirySending] = useState(false)
+  const [enquiryError, setEnquiryError] = useState('')
 
   const [isSaved, setIsSaved] = useState(() => {
     try {
@@ -288,17 +289,30 @@ export default function ProductDetail({
     }
   }
 
-  const submitEnquiry = event => {
+  const submitEnquiry = async event => {
     event.preventDefault()
     setEnquirySending(true)
+    setEnquiryError('')
 
-    setTimeout(() => {
-      setEnquirySending(false)
+    try {
+      const response = await api.sendEnquiry(item._id || item.id, {
+        name: enquiryForm.name,
+        mobileNumber: enquiryForm.mobileNumber,
+        message: enquiryForm.message,
+      })
       setEnquiryModal(false)
       notify?.(
-        'Your enquiry has been sent securely to the seller! An EquipTrade specialist will follow up with you.'
+        response.confirmationEmailSent
+          ? 'Your enquiry has been emailed to the seller.'
+          : 'Your enquiry was sent to the seller, but confirmation email could not be sent.'
       )
-    }, 650)
+    } catch (error) {
+      setEnquiryError(
+        error.message || 'Unable to send your enquiry. Please try again.'
+      )
+    } finally {
+      setEnquirySending(false)
+    }
   }
 
   /* ---------------- Loading State ---------------- */
@@ -922,9 +936,7 @@ export default function ProductDetail({
                   type="email"
                   required
                   value={enquiryForm.email}
-                  onChange={e =>
-                    setEnquiryForm({ ...enquiryForm, email: e.target.value })
-                  }
+                  readOnly
                   placeholder="Enter email address"
                 />
               </label>
@@ -959,6 +971,11 @@ export default function ProductDetail({
                   </>
                 )}
               </button>
+              {enquiryError && (
+                <p className="verification-error" role="alert">
+                  {enquiryError}
+                </p>
+              )}
             </form>
           </div>
         </div>

@@ -2,11 +2,7 @@ import { Router } from 'express'
 import mongoose from 'mongoose'
 
 import Equipment from '../models/Equipment.js'
-
-import {
-  sendListingApprovalEmail,
-  sendListingRejectionEmail,
-} from '../services/mailer.js'
+import { sendListingStatusEmail } from '../services/mailer.js'
 
 import { requireAdmin } from '../middleware/adminAuth.js'
 
@@ -122,57 +118,26 @@ router.patch('/submissions/:id/status', async (req, res) => {
     // RESPOND IMMEDIATELY
     // ==================================================
 
-    /*
-     * IMPORTANT:
-     *
-     * Do NOT wait for the email before updating
-     * the Admin UI.
-     *
-     * MongoDB is already updated at this point.
-     */
+    let emailSent = false
+
+    if (listing.seller?.email) {
+      try {
+        await sendListingStatusEmail(
+          listing.seller.email,
+          listing.seller.name,
+          listing.name,
+          status
+        )
+        emailSent = true
+      } catch (error) {
+        console.error('Failed to send listing decision email:', error)
+      }
+    }
 
     res.status(200).json({
       ...listing,
-      emailSent: false,
+      emailSent,
     })
-
-
-    // ==================================================
-    // SEND EMAIL IN BACKGROUND
-    // ==================================================
-
-    const email = listing.seller?.email
-    const sellerName = listing.seller?.name
-    const equipmentName = listing.name
-
-    if (email) {
-      const sendEmail =
-        status === 'approved'
-          ? sendListingApprovalEmail(
-              email,
-              sellerName,
-              equipmentName
-            )
-          : sendListingRejectionEmail(
-              email,
-              sellerName,
-              equipmentName
-            )
-
-      sendEmail
-        .then((emailSent) => {
-          console.log(
-            `${status} email result for ${email}:`,
-            emailSent
-          )
-        })
-        .catch((error) => {
-          console.error(
-            'Background email failed:',
-            error.message
-          )
-        })
-    }
 
   } catch (error) {
     console.error(
