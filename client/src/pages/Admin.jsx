@@ -485,8 +485,10 @@ export default function Admin({ notify }) {
                 </th>
 
                 <th>
-                  Expected price
+                  Listing type
                 </th>
+
+                <th>Asking price</th>
 
                 <th>
                   Submitted
@@ -594,7 +596,11 @@ export default function Admin({ notify }) {
 
                     {/* Price */}
 
-                    <td data-label="Expected price">
+                    <td data-label="Listing type">
+                      {item.listingType === 'rental' ? 'Rent' : 'Sale'}
+                    </td>
+
+                    <td data-label="Asking price">
 
                       {item.price
                         ? `₹${Number(
@@ -762,6 +768,11 @@ export default function Admin({ notify }) {
                             <div className="admin-product-facts">
 
                               <span>
+                                <b>Listing type</b>
+                                {item.listingType === 'rental' ? 'Rent' : 'Sale'}
+                              </span>
+
+                              <span>
                                 <b>Category</b>
                                 {item.category ||
                                   'Not available'}
@@ -798,7 +809,7 @@ export default function Admin({ notify }) {
                               </span>
 
                               <span>
-                                <b>Price</b>
+                                <b>Asking price</b>
                                 {item.price
                                   ? `₹${Number(
                                       item.price
@@ -939,6 +950,11 @@ export default function Admin({ notify }) {
                 <div className="admin-product-facts">
 
                   <span>
+                    <b>Listing type</b>
+                    {expandedItem.listingType === 'rental' ? 'Rent' : 'Sale'}
+                  </span>
+
+                  <span>
                     <b>Category</b>
                     {expandedItem.category ||
                       'Not available'}
@@ -975,7 +991,7 @@ export default function Admin({ notify }) {
                   </span>
 
                   <span>
-                    <b>Price</b>
+                    <b>Asking price</b>
                     {expandedItem.price
                       ? `₹${Number(
                           expandedItem.price

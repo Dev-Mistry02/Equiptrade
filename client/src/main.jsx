@@ -11,9 +11,11 @@ import {
   Filter,
   Heart,
   House,
+  Info,
   LockKeyhole,
   Menu,
   Search,
+  Scale,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
@@ -30,6 +32,8 @@ import BrowsePage from './pages/Browse'
 import SellPage from './pages/Sell'
 import AdminPage from './pages/Admin'
 import VerificationPage from './pages/Verification'
+import AboutPage from './pages/About'
+import LegalInfoPage from './pages/legalInfo'
 import ProductDetailPage, { toProductSlug } from './pages/ProductDetail'
 import Footer from './components/Footer'
 import './desktop.css'
@@ -39,6 +43,8 @@ const pathToPage = {
   '/home': 'home',
   '/buy': 'browse',
   '/sell': 'sell',
+  '/about': 'about',
+  '/legal-info': 'legal-info',
   '/admin': 'admin',
   '/verification': 'verification',
   '/varification': 'verification',
@@ -49,69 +55,10 @@ const pageToPath = {
   home: '/home',
   browse: '/buy',
   sell: '/sell',
+  about: '/about',
+  'legal-info': '/legal-info',
   admin: '/admin',
   verification: '/verification',
-}
-
-function getTokenExpiration(token) {
-  try {
-    const payload = token.split('.')[1]
-    const base64Payload = payload
-      .replace(/-/g, '+')
-      .replace(/_/g, '/')
-      .padEnd(Math.ceil(payload.length / 4) * 4, '=')
-    const claims = JSON.parse(
-      atob(base64Payload)
-    )
-    const expiresAt = Number(claims.exp) * 1000
-
-    return Number.isFinite(expiresAt) && expiresAt > 0
-      ? expiresAt
-      : 0
-  } catch {
-    return 0
-  }
-}
-
-function hasActiveUserSession() {
-  const token = localStorage.getItem(
-    'equiptrade_user_token'
-  )
-
-  if (!token) {
-    return false
-  }
-
-  const expiresAt = getTokenExpiration(token)
-
-  if (!expiresAt) {
-    localStorage.removeItem('equiptrade_user_token')
-    localStorage.removeItem('equiptrade_user_expires_at')
-    localStorage.removeItem('equiptrade_user')
-    return false
-  }
-
-  // Use the signed JWT expiry as the source of truth and repair stale
-  // client-side expiry values written by older API versions.
-  localStorage.setItem('equiptrade_user_expires_at', String(expiresAt))
-
-  if (expiresAt <= Date.now()) {
-    localStorage.removeItem(
-      'equiptrade_user_token'
-    )
-
-    localStorage.removeItem(
-      'equiptrade_user_expires_at'
-    )
-
-    localStorage.removeItem(
-      'equiptrade_user'
-    )
-
-    return false
-  }
-
-  return true
 }
 
 function getProductSlugFromPath(pathname = window.location.pathname) {
@@ -128,33 +75,32 @@ function getPageFromPath(pathname = window.location.pathname) {
   return pathToPage[pathname] || 'home'
 }
 
-function getStoredAdminSession() {
-  const expiresAt = Number(
-    localStorage.getItem(
-      'equiptrade_admin_expires_at'
-    )
-  )
-
-  const token = localStorage.getItem(
-    'equiptrade_admin_token'
-  )
-
-  return Boolean(
-    token &&
-    expiresAt > Date.now()
-  )
+function hasAcceptedCookieConsent() {
+  return document.cookie
+    .split(';')
+    .some(cookie => cookie.trim() === 'equiptrade_cookie_consent=accepted')
 }
 
-function getStoredUser() {
-  try {
-    return JSON.parse(
-      localStorage.getItem(
-        'equiptrade_user'
-      ) || 'null'
-    )
-  } catch {
-    return null
-  }
+function CookieNotice({ onAccept }) {
+  return (
+    <aside
+      className="cookie-notice"
+      role="dialog"
+      aria-label="Cookie notice"
+      aria-describedby="cookie-notice-message"
+    >
+      <div className="cookie-notice-copy">
+        <strong>We use essential cookies</strong>
+        <p id="cookie-notice-message">
+          Cookies keep your account signed in and help protect your session.
+          Accept to dismiss this notice.
+        </p>
+      </div>
+      <button type="button" onClick={onAccept}>
+        Accept cookies
+      </button>
+    </aside>
+  )
 }
 
 function App() {
@@ -191,26 +137,18 @@ function App() {
     }
   })()
 
-  const [verified, setVerified] = useState(
-    hasActiveUserSession
-  )
+  const [verified, setVerified] = useState(false)
 
   const [adminAuthenticated, setAdminAuthenticated] =
-    useState(getStoredAdminSession)
+    useState(false)
+  const [sessionInitialized, setSessionInitialized] = useState(false)
+  const [user, setUser] = useState(null)
 
   const [page, setPage] = useState(() => {
     const slug = getProductSlugFromPath()
     if (slug) {
       return 'product-detail'
     }
-
-    if (
-      !hasActiveUserSession() &&
-      window.location.pathname !== pageToPath.admin
-    ) {
-      return 'home'
-    }
-
     return getPageFromPath()
   })
 
@@ -235,8 +173,65 @@ function App() {
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState(null)
   const [profileOpen, setProfileOpen] = useState(false)
+  const [cookieConsentAccepted, setCookieConsentAccepted] = useState(
+    hasAcceptedCookieConsent
+  )
 
-  const user = getStoredUser()
+  useEffect(() => {
+    const legacyAuthKeys = [
+      'equiptrade_user_token',
+      'equiptrade_user_expires_at',
+      'equiptrade_user',
+      'equiptrade_admin_token',
+      'equiptrade_admin_expires_at',
+    ]
+    legacyAuthKeys.forEach(key => localStorage.removeItem(key))
+
+    let active = true
+    let latestSessionRequest = 0
+    const syncSession = async () => {
+      const requestId = ++latestSessionRequest
+      try {
+        const session = await api.getSession()
+        if (!active || requestId !== latestSessionRequest) return
+        setUser(session.user || null)
+        setVerified(Boolean(session.user))
+        setAdminAuthenticated(Boolean(session.adminAuthenticated))
+      } catch (error) {
+        if (active && requestId === latestSessionRequest) {
+          console.error('Unable to restore authentication session:', error)
+        }
+      } finally {
+        if (active && requestId === latestSessionRequest) {
+          setSessionInitialized(true)
+        }
+      }
+    }
+
+    const handleSessionExpired = event => {
+      if (event.detail?.scope === 'admin') {
+        setAdminAuthenticated(false)
+        return
+      }
+      setUser(null)
+      setVerified(false)
+      setProfileOpen(false)
+    }
+
+    syncSession()
+    const interval = setInterval(syncSession, 60 * 1000)
+    window.addEventListener('focus', syncSession)
+    window.addEventListener('equiptrade:session-changed', syncSession)
+    window.addEventListener('equiptrade:session-expired', handleSessionExpired)
+
+    return () => {
+      active = false
+      clearInterval(interval)
+      window.removeEventListener('focus', syncSession)
+      window.removeEventListener('equiptrade:session-changed', syncSession)
+      window.removeEventListener('equiptrade:session-expired', handleSessionExpired)
+    }
+  }, [])
 
   useEffect(() => {
     if (!verified && authData.email) {
@@ -256,7 +251,7 @@ function App() {
 
   useEffect(() => {
     const restoreVerificationStep = () => {
-      if (hasActiveUserSession()) return
+      if (verified) return
 
       try {
         const draft = JSON.parse(
@@ -275,48 +270,13 @@ function App() {
 
     window.addEventListener('popstate', restoreVerificationStep)
     return () => window.removeEventListener('popstate', restoreVerificationStep)
-  }, [])
-
-  useEffect(() => {
-    const checkUserSession = () => {
-      const authenticated =
-        hasActiveUserSession()
-
-      if (!authenticated && verified) {
-        setVerified(false)
-        setProfileOpen(false)
-      }
-
-      if (authenticated && !verified) {
-        setVerified(true)
-      }
-    }
-
-    checkUserSession()
-
-    const interval = setInterval(
-      checkUserSession,
-      60 * 1000
-    )
-
-    window.addEventListener(
-      'focus',
-      checkUserSession
-    )
-
-    return () => {
-      clearInterval(interval)
-      window.removeEventListener(
-        'focus',
-        checkUserSession
-      )
-    }
   }, [verified])
 
   useEffect(() => {
+    if (!sessionInitialized) return
+
     const handlePopState = () => {
-      const authenticated =
-        hasActiveUserSession()
+      const authenticated = verified
 
       if (
         authenticated &&
@@ -342,7 +302,8 @@ function App() {
         window.location.pathname !==
         pageToPath.verification &&
         window.location.pathname !==
-        pageToPath.admin
+        pageToPath.admin &&
+        !['about', 'legal-info'].includes(getPageFromPath())
       ) {
         window.history.replaceState(
           {},
@@ -380,8 +341,7 @@ function App() {
       handlePopState
     )
 
-    const authenticated =
-      hasActiveUserSession()
+    const authenticated = verified
 
     if (
       authenticated &&
@@ -406,6 +366,7 @@ function App() {
       pageToPath.verification &&
       window.location.pathname !==
       pageToPath.admin &&
+      !['about', 'legal-info'].includes(getPageFromPath()) &&
       !getProductSlugFromPath(window.location.pathname)
     ) {
       window.history.replaceState(
@@ -440,7 +401,7 @@ function App() {
         'popstate',
         handlePopState
       )
-  }, [verified])
+  }, [verified, sessionInitialized])
 
   const notify = message => {
     setToast(message)
@@ -449,6 +410,13 @@ function App() {
       () => setToast(''),
       3000
     )
+  }
+
+  const acceptCookies = () => {
+    const secure = window.location.protocol === 'https:' ? '; Secure' : ''
+    document.cookie =
+      `equiptrade_cookie_consent=accepted; Max-Age=15552000; Path=/; SameSite=Lax${secure}`
+    setCookieConsentAccepted(true)
   }
 
   const sendOtp = async event => {
@@ -499,21 +467,11 @@ function App() {
         otp,
       })
 
-      if (!response?.token) {
-        throw new Error('Login token was not received from the server.')
-      }
-
-      const expiresAt = getTokenExpiration(response.token)
-      if (!expiresAt) {
-        throw new Error('The server returned an invalid login token. Please try again.')
-      }
-
-      localStorage.setItem('equiptrade_user_token', response.token)
-      localStorage.setItem('equiptrade_user_expires_at', String(expiresAt))
-      localStorage.setItem('equiptrade_user', JSON.stringify(response.user))
+      setUser(response.user)
+      setVerified(true)
+      window.dispatchEvent(new Event('equiptrade:session-changed'))
       localStorage.removeItem('equiptrade_auth_draft')
 
-      setVerified(true)
       setVerificationOpen(false)
 
       const destination = pendingPage
@@ -541,23 +499,19 @@ function App() {
     }
   }
 
-  const logout = () => {
-    localStorage.removeItem(
-      'equiptrade_user_token'
-    )
-
-    localStorage.removeItem(
-      'equiptrade_user_expires_at'
-    )
-
-    localStorage.removeItem(
-      'equiptrade_user'
-    )
-
+  const logout = async () => {
+    try {
+      await api.logout()
+    } catch (error) {
+      notify(`Unable to end the server session: ${error.message}`)
+    } finally {
+      window.dispatchEvent(new Event('equiptrade:session-changed'))
+    }
     localStorage.removeItem(
       'equiptrade_auth_draft'
     )
 
+    setUser(null)
     setProfileOpen(false)
     setVerified(false)
     setVerificationOpen(false)
@@ -574,15 +528,14 @@ function App() {
     navigate('home')
   }
 
-  const adminLogout = () => {
-    localStorage.removeItem(
-      'equiptrade_admin_token'
-    )
-
-    localStorage.removeItem(
-      'equiptrade_admin_expires_at'
-    )
-
+  const adminLogout = async () => {
+    try {
+      await api.adminLogout()
+    } catch (error) {
+      notify(`Unable to end the server session: ${error.message}`)
+    } finally {
+      window.dispatchEvent(new Event('equiptrade:session-changed'))
+    }
     setAdminAuthenticated(false)
   }
 
@@ -637,20 +590,14 @@ function App() {
   }
 
   const guardedNavigate = (nextPage, options = {}) => {
-    const authenticated =
-      hasActiveUserSession()
-
-    if (
-      authenticated &&
-      !verified
-    ) {
-      setVerified(true)
-    }
+    const authenticated = verified
 
     if (
       !authenticated &&
       nextPage !== 'home' &&
-      nextPage !== 'admin'
+      nextPage !== 'admin' &&
+      nextPage !== 'about' &&
+      nextPage !== 'legal-info'
     ) {
       setPendingPage(nextPage)
       setPendingPageOptions(options)
@@ -671,15 +618,7 @@ function App() {
   }
 
   const requireVerification = action => {
-    const authenticated =
-      hasActiveUserSession()
-
-    if (
-      authenticated &&
-      !verified
-    ) {
-      setVerified(true)
-    }
+    const authenticated = verified
 
     if (authenticated) {
       action()
@@ -701,15 +640,7 @@ function App() {
   }
 
   const handleProfileClick = () => {
-    const authenticated =
-      hasActiveUserSession()
-
-    if (
-      authenticated &&
-      !verified
-    ) {
-      setVerified(true)
-    }
+    const authenticated = verified
 
     if (authenticated) {
       setProfileOpen(
@@ -736,27 +667,44 @@ function App() {
     setVerificationOpen(true)
   }
 
+  if (!sessionInitialized) {
+    return (
+      <>
+        <main role="status">Checking your session...</main>
+        {!cookieConsentAccepted && (
+          <CookieNotice onAccept={acceptCookies} />
+        )}
+      </>
+    )
+  }
+
   if (
     verificationOpen &&
-    !hasActiveUserSession()
+    sessionInitialized &&
+    !verified
   ) {
     return (
-      <VerificationPage
-        step={authStep}
-        data={authData}
-        setData={setAuthData}
-        otp={otp}
-        setOtp={setOtp}
-        onSend={sendOtp}
-        onVerify={verifyOtp}
-        onChangeEmail={() => {
-          setAuthStep('details')
-          setOtp('')
-          setAuthError('')
-        }}
-        loading={loading}
-        error={authError}
-      />
+      <>
+        <VerificationPage
+          step={authStep}
+          data={authData}
+          setData={setAuthData}
+          otp={otp}
+          setOtp={setOtp}
+          onSend={sendOtp}
+          onVerify={verifyOtp}
+          onChangeEmail={() => {
+            setAuthStep('details')
+            setOtp('')
+            setAuthError('')
+          }}
+          loading={loading}
+          error={authError}
+        />
+        {!cookieConsentAccepted && (
+          <CookieNotice onAccept={acceptCookies} />
+        )}
+      </>
     )
   }
 
@@ -765,31 +713,42 @@ function App() {
     !adminAuthenticated
   ) {
     return (
-      <AdminLogin
-        onLogin={() =>
-          setAdminAuthenticated(true)
-        }
-      />
+      <>
+        <AdminLogin
+          onLogin={() => {
+            setAdminAuthenticated(true)
+            window.dispatchEvent(new Event('equiptrade:session-changed'))
+          }}
+        />
+        {!cookieConsentAccepted && (
+          <CookieNotice onAccept={acceptCookies} />
+        )}
+      </>
     )
   }
 
   if (page === 'admin') {
     return (
-      <div className="admin-shell">
-        <AdminHeader
-          navigate={navigate}
-          onLogout={adminLogout}
-        />
+      <>
+        <div className="admin-shell">
+          <AdminHeader
+            navigate={navigate}
+            onLogout={adminLogout}
+          />
 
-        <AdminPage notify={notify} />
+          <AdminPage notify={notify} />
 
-        {toast && (
-          <div className="toast">
-            <BadgeCheck size={18} />
-            {toast}
-          </div>
+          {toast && (
+            <div className="toast">
+              <BadgeCheck size={18} />
+              {toast}
+            </div>
+          )}
+        </div>
+        {!cookieConsentAccepted && (
+          <CookieNotice onAccept={acceptCookies} />
         )}
-      </div>
+      </>
     )
   }
 
@@ -840,11 +799,9 @@ function App() {
                 ? 'nav-link active'
                 : 'nav-link'
             }
-            onClick={() =>
-              guardedNavigate('browse')
-            }
+            onClick={() => guardedNavigate('browse')}
           >
-            Buy equipment
+            Buy
           </button>
 
           <button
@@ -853,11 +810,31 @@ function App() {
                 ? 'nav-link active'
                 : 'nav-link'
             }
-            onClick={() =>
-              guardedNavigate('sell')
-            }
+            onClick={() => guardedNavigate('sell')}
           >
-            Sell equipment
+            Sell
+          </button>
+
+          <button
+            className={
+              page === 'about'
+                ? 'nav-link active'
+                : 'nav-link'
+            }
+            onClick={() => navigate('about')}
+          >
+            About
+          </button>
+
+          <button
+            className={
+              page === 'legal-info'
+                ? 'nav-link active'
+                : 'nav-link'
+            }
+            onClick={() => navigate('legal-info')}
+          >
+            Legal Info
           </button>
 
           <button
@@ -1014,6 +991,10 @@ function App() {
         />
       )}
 
+      {page === 'about' && <AboutPage navigate={guardedNavigate} />}
+
+      {page === 'legal-info' && <LegalInfoPage navigate={navigate} />}
+
       {page === 'browse' && (
         <BrowsePage
           search={search}
@@ -1066,6 +1047,10 @@ function App() {
           {toast}
         </div>
       )}
+
+      {!cookieConsentAccepted && (
+        <CookieNotice onAccept={acceptCookies} />
+      )}
     </div>
   )
 }
@@ -1080,18 +1065,22 @@ function MobileDock({ page, navigate, onProfile, profileOpen }) {
         <span>Home</span>
       </button>
       <button
-        className={page === 'browse' || page === 'product-detail' ? 'mobile-dock-item active' : 'mobile-dock-item'}
+        className={
+          page === 'browse' || page === 'product-detail'
+            ? 'mobile-dock-item active'
+            : 'mobile-dock-item'
+        }
         onClick={() => navigate('browse')}
       >
         <Search size={19} />
-        <span>Buy item</span>
+        <span>Buy Equipment</span>
       </button>
       <button
-        className="mobile-dock-item"
+        className={page === 'sell' ? 'mobile-dock-item active' : 'mobile-dock-item'}
         onClick={() => navigate('sell')}
       >
-        <Upload size={18} />
-        <span>Sell item</span>
+        <Upload size={19} />
+        <span>Sell Equipment</span>
       </button>
       <button
         className={profileOpen ? 'mobile-dock-item active' : 'mobile-dock-item'}
@@ -1262,19 +1251,6 @@ function AdminLogin({ onLogin }) {
         await api.adminLogin(
           credentials
         )
-
-      localStorage.setItem(
-        'equiptrade_admin_token',
-        response.token
-      )
-
-      localStorage.setItem(
-        'equiptrade_admin_expires_at',
-        String(
-          Date.now() +
-          response.expiresIn
-        )
-      )
 
       onLogin()
     } catch (requestError) {

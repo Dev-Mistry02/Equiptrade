@@ -1,17 +1,23 @@
 import jwt from 'jsonwebtoken'
 import { env } from '../config/env.js'
+import {
+  getRequestCookie,
+  USER_SESSION_COOKIE,
+} from './sessionCookies.js'
 
 export function requireUser(req, res, next) {
   try {
     const authorization = req.headers.authorization || ''
+    const token =
+      (authorization.startsWith('Bearer ')
+        ? authorization.slice(7)
+        : '') || getRequestCookie(req, USER_SESSION_COOKIE)
 
-    if (!authorization.startsWith('Bearer ')) {
+    if (!token) {
       return res.status(401).json({
         message: 'Authentication required.',
       })
     }
-
-    const token = authorization.slice(7)
 
     const decoded = jwt.verify(token, env.jwtSecret)
 

@@ -9,9 +9,11 @@ export default function Footer({ navigate, notify }) {
         <span className="footer-trust"><ShieldCheck size={15} /> Human-reviewed listings</span>
       </div>
       <div className="footer-links">
-        <strong>Marketplace</strong>
+        <strong>Explore</strong>
         <button onClick={() => navigate('browse')}>Buy equipment <ArrowRight size={14} /></button>
         <button onClick={() => navigate('sell')}>Sell equipment <ArrowRight size={14} /></button>
+        <button onClick={() => navigate('about')}>About EquipTrade <ArrowRight size={14} /></button>
+        <button onClick={() => navigate('legal-info')}>Legal Info <ArrowRight size={14} /></button>
         <button onClick={() => notify('Our equipment specialists are here to help.')}>Contact support <ArrowRight size={14} /></button>
       </div>
       <div className="footer-contact">

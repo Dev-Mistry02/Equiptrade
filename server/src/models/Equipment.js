@@ -7,6 +7,11 @@ const equipmentSchema = new mongoose.Schema({
   model: String,
   year: Number,
   condition: String,
+  listingType: {
+    type: String,
+    enum: ['sale', 'rental'],
+    default: 'sale',
+  },
   usage: String,
   price: Number,
   location: String,

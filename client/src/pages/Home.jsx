@@ -56,16 +56,16 @@ export default function Home({ navigate, setSelected, search, setSearch }) {
       </section>
 
       <section className="home-proof container" aria-label="Marketplace highlights">
-        <div><span className="proof-icon"><BadgeCheck size={18} /></span><strong>100%</strong><span>verified listings</span></div>
-        <div><span className="proof-icon"><Building2 size={18} /></span><strong>Pan-India</strong><span>seller network</span></div>
-        <div><span className="proof-icon"><Zap size={18} /></span><strong>One simple</strong><span>way to enquire</span></div>
+        <div><span className="proof-icon"><BadgeCheck size={18} /></span><strong>Post Equipments</strong><span>List Your Idle Assets with Photo and Details</span></div>
+        <div><span className="proof-icon"><Building2 size={18} /></span><strong>Connect Directly</strong><span>Get Inquiries Directly from Interested</span></div>
+        <div><span className="proof-icon"><Zap size={18} /></span><strong>Deal Done</strong><span>Finalize Price Directly with Zero Commission </span></div>
       </section>
 
       <section className="choice-strip">
         <div className="container choice-grid">
           <button className="choice-card buy" onClick={() => navigate('browse')}>
             <div className="choice-icon"><Search size={23} /></div>
-            <div><span className="card-kicker">For buyers</span><h2>Find your next machine.</h2><p>Compare verified equipment from trusted sellers across India.</p><span className="text-link">Explore equipment <ArrowRight size={16} /></span></div>
+            <div><span className="card-kicker">For buyers</span><h2>Find your Equipment.</h2><p>Compare verified equipment from trusted sellers across India.</p><span className="text-link">Explore equipment <ArrowRight size={16} /></span></div>
             <span className="choice-decoration" aria-hidden="true">01</span>
           </button>
           <button className="choice-card sell" onClick={() => navigate('sell')}>

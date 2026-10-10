@@ -190,6 +190,14 @@ router.get('/:idOrSlug', async (req, res) => {
 
 router.post('/', requireUser, async (req, res) => {
   try {
+    const listingType = req.body.listingType || 'sale'
+
+    if (!['sale', 'rental'].includes(listingType)) {
+      return res.status(400).json({
+        message: 'Choose whether this equipment is for sale or rent.',
+      })
+    }
+
     if (
       !Array.isArray(req.body.images) ||
       req.body.images.length < 3 ||
@@ -206,6 +214,7 @@ router.post('/', requireUser, async (req, res) => {
 
     const listingData = {
       ...req.body,
+      listingType,
       seller: req.user.id,
       status: 'pending',
       verificationStatus: 'Pending Verification',

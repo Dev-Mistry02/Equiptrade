@@ -10,7 +10,6 @@ const router = Router()
 
 router.use(requireAdmin)
 
-
 // ==================================================
 // GET ALL SUBMISSIONS
 // ==================================================

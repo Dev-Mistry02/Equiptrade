@@ -565,7 +565,9 @@ export default function ProductDetail({
           {/* Pricing Box */}
           <div className="pd-price-box">
             <div>
-              <span className="pd-price-label">Offered Price</span>
+              <span className="pd-price-label">
+                {item.listingType === 'rental' ? 'Rental price' : 'Sale price'}
+              </span>
               <div className="pd-price-amount">{formattedPrice}</div>
             </div>
 

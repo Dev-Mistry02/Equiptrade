@@ -3,14 +3,23 @@ import { Router } from 'express'
 import crypto from 'node:crypto'
 import jwt from 'jsonwebtoken'
 import User from '../models/User.js'
-import { createAdminToken } from '../middleware/adminAuth.js'
+import {
+  createAdminToken,
+  isValidAdminToken,
+} from '../middleware/adminAuth.js'
 import Admin from '../models/Admin.js'
 import { env } from '../config/env.js'
 import { sendOtpEmail } from '../services/mailer.js'
+import {
+  ADMIN_SESSION_COOKIE,
+  clearSessionCookie,
+  getRequestCookie,
+  sessionCookieOptions,
+  USER_SESSION_COOKIE,
+} from '../middleware/sessionCookies.js'
 
 const router = Router()
 
-const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000
 const OTP_DURATION_MS = 10 * 60 * 1000
 
 const hashOtp = otp =>
@@ -36,10 +45,8 @@ router.post('/admin-login', async (req, res) => {
       })
     }
 
-    return res.json({
-      token: createAdminToken(),
-      expiresIn: SESSION_DURATION_MS,
-    })
+    res.cookie(ADMIN_SESSION_COOKIE, createAdminToken(), sessionCookieOptions)
+    return res.json({ authenticated: true })
   } catch (error) {
     console.error('Admin login failed:', error.message)
 
@@ -47,6 +54,65 @@ router.post('/admin-login', async (req, res) => {
       message: 'Unable to log in. Please try again.',
     })
   }
+})
+
+router.get('/session', async (req, res) => {
+  try {
+    let user = null
+    const userToken = getRequestCookie(req, USER_SESSION_COOKIE)
+
+    if (userToken) {
+      try {
+        const decoded = jwt.verify(userToken, env.jwtSecret)
+        const account = await User.findById(decoded.id)
+
+        if (account?.verified) {
+          user = {
+            id: String(account._id),
+            name: account.name,
+            email: account.email,
+            mobileNumber: account.mobileNumber,
+            verified: account.verified,
+          }
+        } else {
+          clearSessionCookie(res, USER_SESSION_COOKIE)
+        }
+      } catch (error) {
+        if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+          clearSessionCookie(res, USER_SESSION_COOKIE)
+        } else {
+          throw error
+        }
+      }
+    }
+
+    const adminToken = getRequestCookie(req, ADMIN_SESSION_COOKIE)
+    const adminAuthenticated = isValidAdminToken(adminToken)
+
+    if (adminToken && !adminAuthenticated) {
+      clearSessionCookie(res, ADMIN_SESSION_COOKIE)
+    }
+
+    return res.set('Cache-Control', 'no-store').json({
+      user,
+      adminAuthenticated,
+    })
+  } catch (error) {
+    console.error('Failed to restore authentication session:', error.message)
+    return res.status(500).json({
+      message: 'Unable to restore your session. Please try again.',
+    })
+  }
+})
+
+router.post('/logout', (_req, res) => {
+  clearSessionCookie(res, USER_SESSION_COOKIE)
+  return res.status(204).end()
+})
+
+router.post('/admin-logout', (_req, res) => {
+  clearSessionCookie(res, ADMIN_SESSION_COOKIE)
+  return res.status(204).end()
 })
 
 // Send email OTP
@@ -251,9 +317,8 @@ router.post('/verify-otp', async (req, res) => {
       { expiresIn: '30d' }
     )
 
+    res.cookie(USER_SESSION_COOKIE, token, sessionCookieOptions)
     return res.json({
-      token,
-      expiresIn: SESSION_DURATION_MS,
       user: {
         id: String(user._id),
         name: user.name,

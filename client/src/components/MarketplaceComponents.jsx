@@ -38,6 +38,9 @@ export function EquipmentCard({ item, onClick }) {
         </div>
 
         <h3>{item.name}</h3>
+        <span className="equipment-listing-type">
+          {item.listingType === 'rental' ? 'For rent' : 'For sale'}
+        </span>
 
         <p>
           {item.brand || 'Brand not provided'} · {item.model || 'Model not provided'} · {item.condition || 'Condition not provided'}

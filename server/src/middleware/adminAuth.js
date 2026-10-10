@@ -1,5 +1,9 @@
 import crypto from 'node:crypto'
 import { env } from '../config/env.js'
+import {
+  ADMIN_SESSION_COOKIE,
+  getRequestCookie,
+} from './sessionCookies.js'
 
 const TOKEN_TTL = 30 * 24 * 60 * 60 * 1000
 
@@ -10,7 +14,7 @@ export const createAdminToken = () => {
   return `${payload}.${sign(payload)}`
 }
 
-const isValidToken = token => {
+export const isValidAdminToken = token => {
   const [payload, signature] = String(token || '').split('.')
   if (!payload || !signature) return false
   const expected = sign(payload)
@@ -23,7 +27,14 @@ const isValidToken = token => {
 }
 
 export const requireAdmin = (req, res, next) => {
-  const token = req.headers.authorization?.replace(/^Bearer\s+/i, '')
-  if (!isValidToken(token)) return res.status(401).json({ message: 'Admin login required.' })
+  const authorization = req.headers.authorization || ''
+  const token =
+    authorization.replace(/^Bearer\s+/i, '') ||
+    getRequestCookie(req, ADMIN_SESSION_COOKIE)
+
+  if (!isValidAdminToken(token)) {
+    return res.status(401).json({ message: 'Admin login required.' })
+  }
+
   next()
 }

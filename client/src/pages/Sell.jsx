@@ -41,6 +41,10 @@ const CATEGORY_OPTIONS = [
 ]
 
 const equipmentSchema = z.object({
+  listingType: z.enum(['sale', 'rental'], {
+    required_error: 'Choose whether you want to sell or rent this equipment.',
+  }),
+
   name: z
     .string()
     .trim()
@@ -123,6 +127,7 @@ export default function Sell({
   const fileInputRef = useRef(null)
 
   const [form, setForm] = useState({
+    listingType: 'sale',
     name: '',
     category: '',
     brand: '',
@@ -584,6 +589,37 @@ export default function Sell({
 
               <div className="field-grid">
 
+                <fieldset className="listing-type-field" aria-required="true">
+                  <legend>Listing type</legend>
+                  <div className="listing-type-options">
+                    <label
+                      className={`listing-type-option ${form.listingType === 'sale' ? 'selected' : ''}`}
+                    >
+                      <input
+                        type="radio"
+                        name="listingType"
+                        value="sale"
+                        checked={form.listingType === 'sale'}
+                        required
+                        onChange={update}
+                      />
+                      <span>Sell</span>
+                    </label>
+                    <label
+                      className={`listing-type-option ${form.listingType === 'rental' ? 'selected' : ''}`}
+                    >
+                      <input
+                        type="radio"
+                        name="listingType"
+                        value="rental"
+                        checked={form.listingType === 'rental'}
+                        onChange={update}
+                      />
+                      <span>Rent</span>
+                    </label>
+                  </div>
+                </fieldset>
+
                 {/* Equipment Name */}
                 <label>
                   Equipment name
@@ -666,7 +702,9 @@ export default function Sell({
 
                 {/* Price */}
                 <label>
-                  Expected price
+                  {form.listingType === 'rental'
+                    ? 'Rental price'
+                    : 'Expected sale price'}
 
                   <input
                     type="number"
@@ -920,6 +958,9 @@ export default function Sell({
                   <h3>{form.name}</h3>
 
                   <p className="product-review-price">
+                    <span className="product-review-listing-type">
+                      {form.listingType === 'rental' ? 'For rent' : 'For sale'}
+                    </span>
                     {Number.isFinite(
                       formattedPrice
                     )

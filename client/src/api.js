@@ -1,5 +1,4 @@
 const HOSTED_API_URL = 'https://equiptrade-backend.onrender.com/api'
-const LOCAL_API_URL = 'http://localhost:4000/api'
 const configuredApiUrl = import.meta.env.VITE_API_URL?.trim()
 const isLocalFrontend = ['localhost', '127.0.0.1', '[::1]'].includes(
   window.location.hostname
@@ -16,13 +15,16 @@ const isLocalApiUrl = url => {
   }
 }
 const configuredApiIsLocal = isLocalApiUrl(configuredApiUrl)
-const baseApiUrl = isLocalFrontend
-  ? configuredApiUrl || LOCAL_API_URL
-  : configuredApiUrl && !configuredApiIsLocal
+const useDevelopmentProxy =
+  import.meta.env.DEV && (!configuredApiUrl || configuredApiIsLocal)
+const baseApiUrl = useDevelopmentProxy
+  ? ''
+  : configuredApiUrl && (isLocalFrontend || !configuredApiIsLocal)
     ? configuredApiUrl
     : HOSTED_API_URL
-const API_URL =
-  baseApiUrl.endsWith('/api')
+const API_URL = useDevelopmentProxy
+  ? '/api'
+  : baseApiUrl.endsWith('/api')
     ? baseApiUrl.replace(/\/+$/, '')
     : `${baseApiUrl.replace(/\/+$/, '')}/api`
 
@@ -30,21 +32,15 @@ async function request(path, options = {}) {
   let response
 
   try {
-    const adminToken = localStorage.getItem('equiptrade_admin_token')
-    const userToken = localStorage.getItem('equiptrade_user_token')
-
     const headers = {
       'Content-Type': 'application/json',
-      ...(userToken ? { Authorization: `Bearer ${userToken}` } : {}),
-      ...(path.startsWith('/admin') && adminToken
-        ? { Authorization: `Bearer ${adminToken}` }
-        : {}),
       ...(options.headers || {}),
     }
 
     response = await fetch(`${API_URL}${path}`, {
       ...options,
       headers,
+      credentials: 'include',
       cache: 'no-store',
       signal: options.signal || AbortSignal.timeout(15000),
     })
@@ -62,6 +58,10 @@ async function request(path, options = {}) {
     )
   }
 
+  if (response.status === 204) {
+    return null
+  }
+
   const contentType = response.headers.get('content-type') || ''
 
   const data = contentType.includes('application/json')
@@ -75,10 +75,17 @@ async function request(path, options = {}) {
     (method === 'POST' && path === '/equipment') ||
     (method === 'POST' && /^\/equipment\/[^/]+\/enquiries$/.test(path))
 
-  if (response.status === 401 && requiresUserAuthentication) {
-    localStorage.removeItem('equiptrade_user_token')
-    localStorage.removeItem('equiptrade_user_expires_at')
-    localStorage.removeItem('equiptrade_user')
+  if (
+    response.status === 401 &&
+    (requiresUserAuthentication || path.startsWith('/admin'))
+  ) {
+    window.dispatchEvent(
+      new CustomEvent('equiptrade:session-expired', {
+        detail: {
+          scope: path.startsWith('/admin') ? 'admin' : 'user',
+        },
+      })
+    )
   }
 
   if (!response.ok) {
@@ -91,6 +98,18 @@ async function request(path, options = {}) {
 }
 
 export const api = {
+  getSession: () => request('/auth/session'),
+
+  logout: () =>
+    request('/auth/logout', {
+      method: 'POST',
+    }),
+
+  adminLogout: () =>
+    request('/auth/admin-logout', {
+      method: 'POST',
+    }),
+
   sendOtp: payload =>
     request('/auth/send-otp', {
       method: 'POST',
