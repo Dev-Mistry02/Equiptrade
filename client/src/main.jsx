@@ -7,6 +7,7 @@ import {
   Building2,
   ChevronDown,
   ClipboardCheck,
+  Cog,
   Filter,
   Heart,
   House,
@@ -20,7 +21,6 @@ import {
   Upload,
   UserRound,
   X,
-  Wrench,
   Zap,
 } from 'lucide-react'
 import { api } from './api'
@@ -805,7 +805,7 @@ function App() {
           aria-label="EquipTrade India home"
         >
           <span className="brand-mark">
-            <Wrench size={19} />
+            <Cog size={19} />
           </span>
 
           <span>
@@ -1195,7 +1195,7 @@ function AdminHeader({
         aria-label="EquipTrade India admin home"
       >
         <span className="brand-mark">
-          <Wrench size={19} />
+          <Cog size={19} />
         </span>
 
         <span>
