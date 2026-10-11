@@ -20,7 +20,12 @@ export function EquipmentCard({ item, onClick }) {
 
       <div className="equipment-image">
         {image ? (
-          <img src={image} alt={item.name} />
+          <img
+            src={image}
+            alt={item.name}
+            loading="lazy"
+            decoding="async"
+          />
         ) : (
           <span className="equipment-image-empty">
             No image provided

@@ -46,7 +46,12 @@ export default function Home({ navigate, setSelected, search, setSearch }) {
           </div>
           <div className="hero-visual">
             <div className="hero-image">
-              <img src="https://images.unsplash.com/photo-1565793298595-6a879b1d9492?auto=format&fit=crop&w=1200&q=90" alt="Industrial machinery in a modern workshop" />
+              <img
+                src="https://images.unsplash.com/photo-1565793298595-6a879b1d9492?auto=format&fit=crop&w=900&q=75"
+                alt="Industrial machinery in a modern workshop"
+                fetchPriority="high"
+                decoding="async"
+              />
               <div className="image-label"><span className="status-dot" /> The equipment marketplace <strong>{equipment.length}</strong> listings</div>
             </div>
             <div className="floating-stat"><span className="stat-icon"><BadgeCheck size={20} /></span><div><strong>Verified</strong><small>Every listing reviewed</small></div></div>

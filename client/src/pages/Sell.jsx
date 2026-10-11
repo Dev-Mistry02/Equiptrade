@@ -117,6 +117,7 @@ export default function Sell({
   notify,
   navigate,
   user,
+  requireVerification,
 }) {
   const [step, setStep] = useState(1)
   const [submitted, setSubmitted] = useState(false)
@@ -299,10 +300,7 @@ export default function Sell({
     event.preventDefault()
 
     if (!user?.id) {
-      setError(
-        'Please verify your identity before submitting equipment.'
-      )
-
+      requireVerification?.(() => {})
       return
     }
 

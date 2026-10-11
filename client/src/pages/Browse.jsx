@@ -131,7 +131,7 @@ export default function Browse({
       if (document.visibilityState === 'visible') {
         fetchEquipment()
       }
-    }, 15000)
+    }, 60000)
 
     return () => clearInterval(interval)
   }, [fetchEquipment])

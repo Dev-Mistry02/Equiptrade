@@ -1,4 +1,5 @@
 const HOSTED_API_URL = 'https://equiptradeindia-backend-13lk.onrender.com/api'
+const COLD_START_TIMEOUT_MS = 60000
 const configuredApiUrl = import.meta.env.VITE_API_URL?.trim()
 const isLocalFrontend = ['localhost', '127.0.0.1', '[::1]'].includes(
   window.location.hostname
@@ -30,19 +31,20 @@ const API_URL = useDevelopmentProxy
 
 async function request(path, options = {}) {
   let response
+  const { timeoutMs = 15000, ...fetchOptions } = options
 
   try {
     const headers = {
       'Content-Type': 'application/json',
-      ...(options.headers || {}),
+      ...(fetchOptions.headers || {}),
     }
 
     response = await fetch(`${API_URL}${path}`, {
-      ...options,
+      ...fetchOptions,
       headers,
       credentials: 'include',
       cache: 'no-store',
-      signal: options.signal || AbortSignal.timeout(15000),
+      signal: fetchOptions.signal || AbortSignal.timeout(timeoutMs),
     })
   } catch (error) {
     if (error.name === 'TimeoutError' || error.name === 'AbortError') {
@@ -70,7 +72,7 @@ async function request(path, options = {}) {
         message: `Server returned HTTP ${response.status}. Restart the API server and try again.`,
       }
 
-  const method = (options.method || 'GET').toUpperCase()
+  const method = (fetchOptions.method || 'GET').toUpperCase()
   const requiresUserAuthentication =
     (method === 'POST' && path === '/equipment') ||
     (method === 'POST' && /^\/equipment\/[^/]+\/enquiries$/.test(path)) ||
@@ -99,7 +101,10 @@ async function request(path, options = {}) {
 }
 
 export const api = {
-  getSession: () => request('/auth/session'),
+  getSession: () =>
+    request('/auth/session', {
+      timeoutMs: COLD_START_TIMEOUT_MS,
+    }),
 
   logout: () =>
     request('/auth/logout', {
@@ -159,15 +164,20 @@ export const api = {
     const query = params.toString()
 
     return request(
-      `/equipment${query ? `?${query}` : ''}`
+      `/equipment${query ? `?${query}` : ''}`,
+      { timeoutMs: COLD_START_TIMEOUT_MS }
     )
   },
 
   getEquipmentByIdOrSlug: idOrSlug =>
-    request(`/equipment/${encodeURIComponent(idOrSlug)}`),
+    request(`/equipment/${encodeURIComponent(idOrSlug)}`, {
+      timeoutMs: COLD_START_TIMEOUT_MS,
+    }),
 
   getAdminSubmissions: () =>
-    request('/admin/submissions'),
+    request('/admin/submissions', {
+      timeoutMs: COLD_START_TIMEOUT_MS,
+    }),
 
   updateSubmissionStatus: (
     id,

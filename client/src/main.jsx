@@ -78,6 +78,21 @@ function getPageFromPath(pathname = window.location.pathname) {
   return pathToPage[pathname] || 'home'
 }
 
+function isPublicPath(pathname) {
+  return (
+    pathname === '/' ||
+    [
+      '/home',
+      '/buy',
+      '/sell',
+      '/about',
+      '/legal-info',
+      '/contact',
+    ].includes(pathname) ||
+    Boolean(getProductSlugFromPath(pathname))
+  )
+}
+
 function hasAcceptedCookieConsent() {
   return document.cookie
     .split(';')
@@ -159,11 +174,9 @@ function App() {
     getProductSlugFromPath()
   )
   const [selectedProduct, setSelectedProduct] = useState(null)
-  const [pendingPageOptions, setPendingPageOptions] = useState(null)
   const [mobileMenu, setMobileMenu] = useState(false)
   const [verificationOpen, setVerificationOpen] =
     useState(false)
-  const [pendingPage, setPendingPage] = useState(null)
   const [pendingAction, setPendingAction] = useState(null)
   const [authStep, setAuthStep] = useState(savedAuthDraft.step)
   const [authData, setAuthData] = useState(
@@ -237,6 +250,22 @@ function App() {
   }, [])
 
   useEffect(() => {
+    if (!sessionInitialized || !pendingAction) return
+
+    if (verified) {
+      const action = pendingAction
+      setPendingAction(null)
+      action()
+      return
+    }
+
+    if (!verificationOpen) {
+      window.history.pushState({}, '', pageToPath.verification)
+      setVerificationOpen(true)
+    }
+  }, [sessionInitialized, verified, pendingAction, verificationOpen])
+
+  useEffect(() => {
     if (!verified && authData.email) {
       localStorage.setItem(
         'equiptrade_auth_draft',
@@ -294,19 +323,16 @@ function App() {
 
         setPage('home')
         setVerificationOpen(false)
+        setPendingAction(null)
 
         return
       }
 
       if (
         !authenticated &&
-        window.location.pathname !==
-        pageToPath.home &&
-        window.location.pathname !==
-        pageToPath.verification &&
-        window.location.pathname !==
-        pageToPath.admin &&
-        !['about', 'legal-info'].includes(getPageFromPath())
+        window.location.pathname !== pageToPath.verification &&
+        window.location.pathname !== pageToPath.admin &&
+        !isPublicPath(window.location.pathname)
       ) {
         window.history.replaceState(
           {},
@@ -324,12 +350,15 @@ function App() {
         pageToPath.verification
       ) {
         setVerificationOpen(true)
-        setPage('home')
+        if (!pendingAction) {
+          setPage('home')
+        }
 
         return
       }
 
       setVerificationOpen(false)
+      setPendingAction(null)
       const currentSlug = getProductSlugFromPath()
       if (currentSlug) {
         setProductSlug(currentSlug)
@@ -363,14 +392,9 @@ function App() {
 
     if (
       !authenticated &&
-      window.location.pathname !==
-      pageToPath.home &&
-      window.location.pathname !==
-      pageToPath.verification &&
-      window.location.pathname !==
-      pageToPath.admin &&
-      !['about', 'legal-info'].includes(getPageFromPath()) &&
-      !getProductSlugFromPath(window.location.pathname)
+      window.location.pathname !== pageToPath.verification &&
+      window.location.pathname !== pageToPath.admin &&
+      !isPublicPath(window.location.pathname)
     ) {
       window.history.replaceState(
         {},
@@ -396,7 +420,9 @@ function App() {
       pageToPath.verification
     ) {
       setVerificationOpen(true)
-      setPage('home')
+      if (!pendingAction) {
+        setPage('home')
+      }
     }
 
     return () =>
@@ -404,7 +430,7 @@ function App() {
         'popstate',
         handlePopState
       )
-  }, [verified, sessionInitialized])
+  }, [verified, sessionInitialized, pendingAction])
 
   const notify = message => {
     setToast(message)
@@ -477,19 +503,11 @@ function App() {
 
       setVerificationOpen(false)
 
-      const destination = pendingPage
-      const destinationOptions = pendingPageOptions
       const action = pendingAction
-      setPendingPage(null)
-      setPendingPageOptions(null)
       setPendingAction(null)
 
-      if (destination) {
-        navigate(destination, destinationOptions || {})
-      } else if (action) {
-        window.history.replaceState({}, '', pageToPath.home)
-        action()
-      }
+      closeVerification()
+      action?.()
 
       notify('Account verified. Welcome to EquipTrade.')
     } catch (error) {
@@ -518,7 +536,6 @@ function App() {
     setProfileOpen(false)
     setVerified(false)
     setVerificationOpen(false)
-    setPendingPage(null)
     setPendingAction(null)
     setAuthStep('details')
     setAuthData({
@@ -595,31 +612,6 @@ function App() {
   }
 
   const guardedNavigate = (nextPage, options = {}) => {
-    const authenticated = verified
-
-    if (
-      !authenticated &&
-      nextPage !== 'home' &&
-      nextPage !== 'admin' &&
-      nextPage !== 'about' &&
-      nextPage !== 'legal-info' &&
-      nextPage !== 'contact'
-    ) {
-      setPendingPage(nextPage)
-      setPendingPageOptions(options)
-      setPendingAction(null)
-
-      window.history.pushState(
-        {},
-        '',
-        pageToPath.verification
-      )
-
-      setVerificationOpen(true)
-
-      return
-    }
-
     navigate(nextPage, options)
   }
 
@@ -627,22 +619,27 @@ function App() {
     const authenticated = verified
 
     if (authenticated) {
-      action()
+      action?.()
       return
     }
 
-    setPendingPage(null)
-    setPendingAction(
-      () => action
-    )
+    setPendingAction(() => action || (() => {}))
 
-    window.history.pushState(
-      {},
-      '',
-      pageToPath.verification
-    )
+    if (sessionInitialized) {
+      window.history.pushState({}, '', pageToPath.verification)
+      setVerificationOpen(true)
+    }
+  }
 
-    setVerificationOpen(true)
+  const closeVerification = () => {
+    setVerificationOpen(false)
+    setPendingAction(null)
+
+    const returnPath =
+      page === 'product-detail'
+        ? `/buy/${productSlug}`
+        : pageToPath[page] || pageToPath.home
+    window.history.replaceState({}, '', returnPath)
   }
 
   const handleProfileClick = () => {
@@ -656,60 +653,18 @@ function App() {
       return
     }
 
-    setPendingPage(null)
-
-    setPendingAction(
-      () =>
-        () =>
-          setProfileOpen(true)
-    )
-
-    window.history.pushState(
-      {},
-      '',
-      pageToPath.verification
-    )
-
-    setVerificationOpen(true)
+    requireVerification(() => setProfileOpen(true))
   }
 
-  if (!sessionInitialized) {
+  const requiresSession = page === 'admin' || page === 'verification'
+
+  if (!sessionInitialized && (requiresSession || verificationOpen)) {
     return (
       <>
         <main className="session-loader" role="status" aria-live="polite">
           <LoaderCircle className="action-spinner" size={34} />
           <span>Loading EquipTrade...</span>
         </main>
-        {!cookieConsentAccepted && (
-          <CookieNotice onAccept={acceptCookies} />
-        )}
-      </>
-    )
-  }
-
-  if (
-    verificationOpen &&
-    sessionInitialized &&
-    !verified
-  ) {
-    return (
-      <>
-        <VerificationPage
-          step={authStep}
-          data={authData}
-          setData={setAuthData}
-          otp={otp}
-          setOtp={setOtp}
-          onSend={sendOtp}
-          onVerify={verifyOtp}
-          onChangeEmail={() => {
-            setAuthStep('details')
-            setOtp('')
-            setAuthError('')
-          }}
-          loading={loading}
-          error={authError}
-        />
         {!cookieConsentAccepted && (
           <CookieNotice onAccept={acceptCookies} />
         )}
@@ -1040,6 +995,7 @@ function App() {
           notify={notify}
           navigate={guardedNavigate}
           user={user}
+          requireVerification={requireVerification}
         />
       )}
 
@@ -1067,6 +1023,35 @@ function App() {
 
       {!cookieConsentAccepted && (
         <CookieNotice onAccept={acceptCookies} />
+      )}
+
+      {verificationOpen && sessionInitialized && !verified && (
+        <div className="verification-overlay">
+          <button
+            type="button"
+            className="verification-overlay-close"
+            onClick={closeVerification}
+          >
+            <ArrowRight size={16} />
+            Back to marketplace
+          </button>
+          <VerificationPage
+            step={authStep}
+            data={authData}
+            setData={setAuthData}
+            otp={otp}
+            setOtp={setOtp}
+            onSend={sendOtp}
+            onVerify={verifyOtp}
+            onChangeEmail={() => {
+              setAuthStep('details')
+              setOtp('')
+              setAuthError('')
+            }}
+            loading={loading}
+            error={authError}
+          />
+        </div>
       )}
     </div>
   )

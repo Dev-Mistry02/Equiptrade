@@ -200,6 +200,7 @@ router.post('/send-otp', async (req, res) => {
     console.error('Failed to send account verification code:', {
       status: error?.status,
       message: error?.message,
+      providerError: error?.providerError,
     })
 
     const isConfigurationError =
@@ -208,19 +209,19 @@ router.post('/send-otp', async (req, res) => {
 
     const isAuthenticationError =
       error?.status === 401 || error?.status === 403
+    const isEmailConfigurationError =
+      isConfigurationError || isAuthenticationError
 
     let message =
       'Email delivery failed. Check the backend logs and email provider settings.'
 
-    if (isConfigurationError) {
-      message = `Email configuration error: ${error.message}`
-    } else if (isAuthenticationError) {
+    if (isEmailConfigurationError) {
       message =
-        'Resend rejected the API key. Check RESEND_API_KEY and its permissions.'
+        'We could not send a verification code right now. Please try again later or contact support.'
     }
 
     return res.status(
-      isConfigurationError ? 503 : 502
+      isEmailConfigurationError ? 503 : 502
     ).json({ message })
   }
 })

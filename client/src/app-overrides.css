@@ -125,6 +125,34 @@
   background: linear-gradient(135deg, #edf5f5 0%, #faf9f6 58%, #f5edd9 100%);
 }
 
+.verification-overlay {
+  position: fixed;
+  z-index: 900;
+  inset: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: #102a4366;
+}
+
+.verification-overlay-close {
+  display: inline-flex;
+  position: absolute;
+  z-index: 2;
+  top: max(12px, env(safe-area-inset-top));
+  right: max(12px, env(safe-area-inset-right));
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid rgba(220, 229, 235, .9);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 8px 24px rgba(16, 42, 67, .12);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .verification-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 440px;
@@ -2384,6 +2412,22 @@
     font-size: 9px;
   }
 }
+
+@media (max-width: 700px) {
+  .pd-mobile-sticky-bar {
+    right: 12px;
+    bottom: calc(82px + env(safe-area-inset-bottom));
+    left: 12px;
+    z-index: 80;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+  }
+
+  .product-detail-page {
+    padding-bottom: 180px;
+  }
+}
+
   .equipment-card {
     border-radius: 17px;
     box-shadow: 0 8px 22px rgba(16, 42, 67, .04);
@@ -3856,8 +3900,8 @@ body {
     display: grid;
     grid-column: 2;
     grid-row: 1 / 3;
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
     margin: 0;
   }
 
@@ -3984,6 +4028,11 @@ body {
 }
 
 @media (max-width: 700px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
   .home-page .hero-copy .hero-search {
     box-sizing: border-box;
     width: calc(100% - 32px);
@@ -6350,6 +6399,10 @@ body {
     margin-bottom: 13px;
     padding: 9px;
     border-radius: 14px;
+  }
+
+  .pd-mobile-enquire-btn {
+    min-height: 44px;
   }
 
   .page.browse-page .browse-search {
