@@ -7,12 +7,12 @@ import {
   Building2,
   ChevronDown,
   ClipboardCheck,
-  Cog,
   Filter,
   Heart,
   House,
   Info,
   LockKeyhole,
+  LoaderCircle,
   Menu,
   Search,
   Scale,
@@ -34,8 +34,10 @@ import AdminPage from './pages/Admin'
 import VerificationPage from './pages/Verification'
 import AboutPage from './pages/About'
 import LegalInfoPage from './pages/legalInfo'
+import ContactPage from './pages/Contact'
 import ProductDetailPage, { toProductSlug } from './pages/ProductDetail'
 import Footer from './components/Footer'
+import BrandLogo from './components/BrandLogo'
 import './desktop.css'
 import './app-overrides.css'
 
@@ -57,6 +59,7 @@ const pageToPath = {
   sell: '/sell',
   about: '/about',
   'legal-info': '/legal-info',
+  contact: '/contact',
   admin: '/admin',
   verification: '/verification',
 }
@@ -583,9 +586,11 @@ function App() {
     setPage(nextPage)
     setMobileMenu(false)
 
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth',
+    window.requestAnimationFrame(() => {
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth',
+      })
     })
   }
 
@@ -597,7 +602,8 @@ function App() {
       nextPage !== 'home' &&
       nextPage !== 'admin' &&
       nextPage !== 'about' &&
-      nextPage !== 'legal-info'
+      nextPage !== 'legal-info' &&
+      nextPage !== 'contact'
     ) {
       setPendingPage(nextPage)
       setPendingPageOptions(options)
@@ -670,7 +676,10 @@ function App() {
   if (!sessionInitialized) {
     return (
       <>
-        <main role="status">Checking your session...</main>
+        <main className="session-loader" role="status" aria-live="polite">
+          <LoaderCircle className="action-spinner" size={34} />
+          <span>Loading EquipTrade...</span>
+        </main>
         {!cookieConsentAccepted && (
           <CookieNotice onAccept={acceptCookies} />
         )}
@@ -763,20 +772,23 @@ function App() {
           }
           aria-label="EquipTrade India home"
         >
-          <span className="brand-mark">
-            <Cog size={19} />
-          </span>
-
-          <span>
-            equip<span>trade</span>
-            <small>INDIA</small>
-          </span>
+          <BrandLogo />
         </button>
 
-        <nav
-          className={
-            mobileMenu
-              ? 'main-nav open'
+          {mobileMenu && (
+            <button
+              type="button"
+              className="mobile-menu-backdrop"
+              aria-label="Close navigation menu"
+              onClick={() => setMobileMenu(false)}
+            />
+          )}
+
+          <nav
+            id="mobile-navigation"
+            className={
+              mobileMenu
+                ? 'main-nav open'
               : 'main-nav'
           }
         >
@@ -818,8 +830,8 @@ function App() {
           <button
             className={
               page === 'about'
-                ? 'nav-link active'
-                : 'nav-link'
+                ? 'nav-link mobile-sidebar-link active'
+                : 'nav-link mobile-sidebar-link'
             }
             onClick={() => navigate('about')}
           >
@@ -829,8 +841,8 @@ function App() {
           <button
             className={
               page === 'legal-info'
-                ? 'nav-link active'
-                : 'nav-link'
+                ? 'nav-link mobile-sidebar-link active'
+                : 'nav-link mobile-sidebar-link'
             }
             onClick={() => navigate('legal-info')}
           >
@@ -838,12 +850,12 @@ function App() {
           </button>
 
           <button
-            className="nav-link"
-            onClick={() =>
-              notify(
-                'Our equipment specialists are here to help.'
-              )
+            className={
+              page === 'contact'
+                ? 'nav-link mobile-sidebar-link active'
+                : 'nav-link mobile-sidebar-link'
             }
+            onClick={() => navigate('contact')}
           >
             Contact
           </button>
@@ -905,12 +917,15 @@ function App() {
 
           <button
             className="menu-toggle"
+            type="button"
             onClick={() =>
               setMobileMenu(
                 !mobileMenu
               )
             }
-            aria-label="Toggle menu"
+            aria-label={mobileMenu ? 'Close menu' : 'Open menu'}
+            aria-expanded={mobileMenu}
+            aria-controls="mobile-navigation"
           >
             {mobileMenu ? (
               <X />
@@ -994,6 +1009,8 @@ function App() {
       {page === 'about' && <AboutPage navigate={guardedNavigate} />}
 
       {page === 'legal-info' && <LegalInfoPage navigate={navigate} />}
+
+      {page === 'contact' && <ContactPage navigate={navigate} />}
 
       {page === 'browse' && (
         <BrowsePage
@@ -1183,14 +1200,7 @@ function AdminHeader({
         }
         aria-label="EquipTrade India admin home"
       >
-        <span className="brand-mark">
-          <Cog size={19} />
-        </span>
-
-        <span>
-          equip<span>trade</span>
-          <small>ADMIN</small>
-        </span>
+        <BrandLogo subtitle="ADMIN" />
       </button>
 
       <div className="admin-topbar-actions">

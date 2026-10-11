@@ -5,6 +5,7 @@ import mongoose from 'mongoose';
 import { env, validateSecuritySecrets } from './config/env.js';
 import authRoutes from './routes/auth.routes.js';
 import equipmentRoutes from './routes/equipment.routes.js';
+import feedbackRoutes from './routes/feedback.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import User from './models/User.js';
 
@@ -62,6 +63,7 @@ app.use('/api', (_req, res, next) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/equipment', equipmentRoutes);
+app.use('/api/feedback', feedbackRoutes);
 app.use('/api/admin', adminRoutes);
 
 async function ensureUserIndexes() {

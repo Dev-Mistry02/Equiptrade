@@ -177,7 +177,7 @@ export default function Browse({
     Object.values(filters).filter(Boolean).length
 
   return (
-    <main className="container page">
+    <main className="container page browse-page">
 
       {/* PAGE HEADING */}
       <div className="page-heading">

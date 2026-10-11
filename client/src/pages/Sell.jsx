@@ -517,7 +517,7 @@ export default function Sell({
       {/* PAGE HEADING */}
 
       <div className="page-heading">
-        <div>
+        <div className="sell-heading-copy">
           <span className="eyebrow">
             Seller workspace
           </span>
@@ -533,10 +533,22 @@ export default function Sell({
             verify the listing before it
             reaches serious buyers.
           </p>
+          <div className="sell-trust-note">
+            <ShieldCheck size={17} />
+            <span>
+              <strong>Reviewed by our team</strong>
+              <small>Your listing stays private until it is approved.</small>
+            </span>
+          </div>
         </div>
 
-        <div className="step-count">
-          Step <strong>{step}</strong> of 3
+        <div className="step-count" aria-label={`Step ${step} of 3`}>
+          <span>LISTING PROGRESS</span>
+          <strong>{String(step).padStart(2, '0')}<i>/03</i></strong>
+          <span className="sell-step-meter" aria-hidden="true">
+            <i style={{ width: `${(step / 3) * 100}%` }} />
+          </span>
+          <small>{['Equipment details', 'Description & photos', 'Review & submit'][step - 1]}</small>
         </div>
       </div>
 
@@ -544,29 +556,26 @@ export default function Sell({
 
         <div className="form-progress">
           <span
-            className={
-              step >= 1 ? 'active' : ''
-            }
+            className={step >= 1 ? 'active' : ''}
+            aria-current={step === 1 ? 'step' : undefined}
           >
-            01
+            <i>01</i>
             <b>Equipment details</b>
           </span>
 
           <span
-            className={
-              step >= 2 ? 'active' : ''
-            }
+            className={step >= 2 ? 'active' : ''}
+            aria-current={step === 2 ? 'step' : undefined}
           >
-            02
+            <i>02</i>
             <b>Description & photos</b>
           </span>
 
           <span
-            className={
-              step >= 3 ? 'active' : ''
-            }
+            className={step >= 3 ? 'active' : ''}
+            aria-current={step === 3 ? 'step' : undefined}
           >
-            03
+            <i>03</i>
             <b>Review & submit</b>
           </span>
         </div>

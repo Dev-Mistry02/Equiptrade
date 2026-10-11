@@ -17,6 +17,7 @@ import {
   Share2,
   ShieldCheck,
   Sparkles,
+  Star,
   Tag,
   Truck,
   Wrench,
@@ -78,6 +79,13 @@ export default function ProductDetail({
   const [enquiryModal, setEnquiryModal] = useState(false)
   const [enquirySending, setEnquirySending] = useState(false)
   const [enquiryError, setEnquiryError] = useState('')
+  const [confirmationEmailSent, setConfirmationEmailSent] = useState(false)
+  const [ratingModal, setRatingModal] = useState(false)
+  const [ratingPending, setRatingPending] = useState(false)
+  const [serviceRating, setServiceRating] = useState(0)
+  const [feedbackMessage, setFeedbackMessage] = useState('')
+  const [feedbackSending, setFeedbackSending] = useState(false)
+  const [feedbackError, setFeedbackError] = useState('')
 
   const [isSaved, setIsSaved] = useState(() => {
     try {
@@ -108,6 +116,17 @@ export default function ProductDetail({
       }))
     }
   }, [user])
+
+  useEffect(() => {
+    if (!ratingPending) return undefined
+
+    const timeoutId = window.setTimeout(() => {
+      setRatingPending(false)
+      setRatingModal(true)
+    }, 5000)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [ratingPending])
 
   /*
    * Fetch item if not already loaded in memory or on direct URL visit
@@ -300,11 +319,16 @@ export default function ProductDetail({
         mobileNumber: enquiryForm.mobileNumber,
         message: enquiryForm.message,
       })
+      setConfirmationEmailSent(response.confirmationEmailSent)
       setEnquiryModal(false)
+      setServiceRating(0)
+      setFeedbackMessage('')
+      setFeedbackError('')
+      setRatingPending(true)
       notify?.(
         response.confirmationEmailSent
-          ? 'Your enquiry has been emailed to the seller.'
-          : 'Your enquiry was sent to the seller, but confirmation email could not be sent.'
+          ? 'Your enquiry was sent to the seller.'
+          : 'Your enquiry was sent, but the confirmation email could not be sent.'
       )
     } catch (error) {
       setEnquiryError(
@@ -312,6 +336,28 @@ export default function ProductDetail({
       )
     } finally {
       setEnquirySending(false)
+    }
+  }
+
+  const submitServiceFeedback = async event => {
+    event.preventDefault()
+    setFeedbackSending(true)
+    setFeedbackError('')
+
+    try {
+      await api.submitServiceFeedback({
+        equipmentId: item._id || item.id,
+        rating: serviceRating,
+        message: feedbackMessage,
+      })
+      setRatingModal(false)
+      notify?.('Thank you for rating our services.')
+    } catch (error) {
+      setFeedbackError(
+        error.message || 'Unable to save your feedback. Please try again.'
+      )
+    } finally {
+      setFeedbackSending(false)
     }
   }
 
@@ -740,7 +786,7 @@ export default function ProductDetail({
       </section>
 
       {/* ---------------- BUYER PROTECTION & ESCROW BANNER ---------------- */}
-      <section className="pd-protection-strip">
+      {/* <section className="pd-protection-strip">
         <div className="pd-protection-header">
           <span>The EquipTrade Standard</span>
           <h3>Transact with Absolute Confidence</h3>
@@ -771,7 +817,7 @@ export default function ProductDetail({
             </p>
           </div>
         </div>
-      </section>
+      </section> */}
 
       {/* ---------------- RELATED EQUIPMENT ---------------- */}
       {relatedListings.length > 0 && (
@@ -927,7 +973,7 @@ export default function ProductDetail({
                         mobileNumber: e.target.value,
                       })
                     }
-                    placeholder="e.g. +91 98765 43210"
+                    placeholder="e.g. 9274705046"
                   />
                 </label>
               </div>
@@ -976,6 +1022,111 @@ export default function ProductDetail({
               {enquiryError && (
                 <p className="verification-error" role="alert">
                   {enquiryError}
+                </p>
+              )}
+            </form>
+          </div>
+        </div>
+      )}
+
+      {ratingModal && (
+        <div
+          className="pd-modal-backdrop pd-rating-backdrop"
+          onClick={() => setRatingModal(false)}
+        >
+          <div
+            className="pd-modal-box pd-rating-box"
+            onClick={event => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pd-rating-title"
+          >
+            <button
+              type="button"
+              className="pd-modal-close"
+              onClick={() => setRatingModal(false)}
+              aria-label="Close service rating"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="pd-rating-hero">
+              <span className="pd-rating-success-icon"><CheckCircle2 size={23} /></span>
+              <span className="pd-rating-kicker"><Sparkles size={14} /> ENQUIRY SENT</span>
+              <h3 id="pd-rating-title">How did we do?</h3>
+              <p>
+                {confirmationEmailSent
+                  ? 'Your enquiry reached the seller. Take a moment to rate your EquipTrade experience.'
+                  : 'Your enquiry reached the seller. We could not send a confirmation email, but you can still rate your experience.'}
+              </p>
+            </div>
+
+            <form className="pd-modal-form" onSubmit={submitServiceFeedback}>
+              <div className="pd-rating-picker">
+                <span className="pd-rating-prompt">Your overall experience</span>
+                <div className="pd-rating-stars" role="group" aria-label="Service rating">
+                  {[1, 2, 3, 4, 5].map(value => (
+                    <button
+                      key={value}
+                      type="button"
+                      className={value <= serviceRating ? 'selected' : ''}
+                      onClick={() => setServiceRating(value)}
+                      aria-label={`${value} ${value === 1 ? 'star' : 'stars'}`}
+                      aria-pressed={serviceRating === value}
+                    >
+                      <Star size={30} fill={value <= serviceRating ? 'currentColor' : 'none'} />
+                    </button>
+                  ))}
+                </div>
+                <span className="pd-rating-hint">
+                  {serviceRating
+                    ? ['Poor', 'Fair', 'Good', 'Very good', 'Excellent'][serviceRating - 1]
+                    : 'Tap a star to rate'}
+                </span>
+              </div>
+
+              <label className="pd-feedback-readonly">
+                Your Name
+                <input type="text" value={user?.name || ''} readOnly />
+              </label>
+
+              <label className="pd-feedback-readonly">
+                Email Address
+                <input type="email" value={user?.email || ''} readOnly />
+              </label>
+
+              <label>
+                Your Message <span className="pd-feedback-optional">Your feedback helps us improve</span>
+                <textarea
+                  required
+                  rows={4}
+                  maxLength={2000}
+                  value={feedbackMessage}
+                  onChange={event => setFeedbackMessage(event.target.value)}
+                  placeholder="Tell us how we can improve your experience..."
+                />
+              </label>
+
+              <button
+                type="submit"
+                className="pd-modal-submit-btn pd-rating-submit"
+                disabled={feedbackSending || serviceRating === 0}
+              >
+                {feedbackSending ? (
+                  <>
+                    <LoaderCircle className="action-spinner" size={17} />
+                    Saving feedback...
+                  </>
+                ) : (
+                  <>
+                    Share my feedback
+                    <ArrowRight size={16} />
+                  </>
+                )}
+              </button>
+              {feedbackError && (
+                <p className="verification-error" role="alert">
+                  {feedbackError}
                 </p>
               )}
             </form>

@@ -4,8 +4,8 @@ import {
   Building2,
   Mail,
   ShieldCheck,
-  Wrench,
 } from 'lucide-react'
+import BrandLogo from '../components/BrandLogo'
 
 export default function Verification({
   step,
@@ -24,10 +24,7 @@ export default function Verification({
       <div className="verification-layout">
         <div className="verification-intro">
           <div className="auth-brand">
-            <span className="brand-mark">
-              <Wrench size={17} />
-            </span>
-            equip<span>trade</span>
+            <BrandLogo />
           </div>
 
           <div className="verification-kicker">

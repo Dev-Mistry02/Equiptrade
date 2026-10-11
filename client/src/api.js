@@ -73,7 +73,8 @@ async function request(path, options = {}) {
   const method = (options.method || 'GET').toUpperCase()
   const requiresUserAuthentication =
     (method === 'POST' && path === '/equipment') ||
-    (method === 'POST' && /^\/equipment\/[^/]+\/enquiries$/.test(path))
+    (method === 'POST' && /^\/equipment\/[^/]+\/enquiries$/.test(path)) ||
+    (method === 'POST' && path === '/feedback')
 
   if (
     response.status === 401 &&
@@ -198,6 +199,12 @@ export const api = {
 
   sendEnquiry: (id, payload) =>
     request(`/equipment/${encodeURIComponent(id)}/enquiries`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  submitServiceFeedback: payload =>
+    request('/feedback', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),

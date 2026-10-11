@@ -1,4 +1,4 @@
-import { ArrowRight, BadgeCheck, Building2, ClipboardCheck, Search, ShieldCheck, Sparkles, Truck, Upload, Zap } from 'lucide-react'
+import { ArrowRight, BadgeCheck, Building2, Check, ClipboardCheck, Handshake, Search, ShieldCheck, Sparkles, Truck, Upload, Zap } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api'
 import { EquipmentCard, Process, SectionHeading } from '../components/MarketplaceComponents'
@@ -56,9 +56,9 @@ export default function Home({ navigate, setSelected, search, setSearch }) {
       </section>
 
       <section className="home-proof container" aria-label="Marketplace highlights">
-        <div><span className="proof-icon"><BadgeCheck size={18} /></span><strong>Post Equipments</strong><span>List Your Idle Assets with Photo and Details</span></div>
-        <div><span className="proof-icon"><Building2 size={18} /></span><strong>Connect Directly</strong><span>Get Inquiries Directly from Interested</span></div>
-        <div><span className="proof-icon"><Zap size={18} /></span><strong>Deal Done</strong><span>Finalize Price Directly with Zero Commission </span></div>
+        <div><span className="proof-icon"><BadgeCheck size={18} /></span><strong>Post Equipments</strong><span>List Your Idle Assets</span></div>
+        <div><span className="proof-icon"><Building2 size={18} /></span><strong>Connect Directly</strong><span>Get Inquiries Directly</span></div>
+        <div><span className="proof-icon"><Handshake size={18} /></span><strong>Deal Done</strong><span>with Zero Commission </span></div>
       </section>
 
       <section className="choice-strip">
@@ -99,11 +99,20 @@ export default function Home({ navigate, setSelected, search, setSearch }) {
         </div>
       </section>
 
-      <section className="trust-banner">
-        <div className="container trust-content">
-          <div><span className="eyebrow light">Built for confident decisions</span><h2>Good work starts<br /><em>with good equipment.</em></h2></div>
-          <div className="trust-points"><span><BadgeCheck /> Verified listing photos</span><span><ShieldCheck /> Secure buyer enquiries</span><span><Sparkles /> Dedicated support</span></div>
-          <button className="button light-button" onClick={() => navigate('browse')}>Find your equipment <ArrowRight size={17} /></button>
+      <section className="home-reference-cta">
+        <div className="home-reference-cta-card">
+          <span className="home-reference-cta-icon"><Sparkles size={19} /></span>
+          <div className="home-reference-cta-copy">
+            <span className="home-reference-cta-kicker">Your next move starts here</span>
+            <h2>Good equipment.<br /><em>Better possibilities.</em></h2>
+            <p>Find a machine for the work ahead—or find a buyer for the one you have.</p>
+            <button onClick={() => navigate('browse')}>Explore equipment <ArrowRight size={17} /></button>
+            <div className="home-reference-cta-trust">
+              <span><Check size={14} /> Human-reviewed listings</span>
+              <i aria-hidden="true" />
+              <span><Truck size={14} /> Across India</span>
+            </div>
+          </div>
         </div>
       </section>
     </main>
