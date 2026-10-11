@@ -1,4 +1,4 @@
-const HOSTED_API_URL = 'https://equiptradeindia-backend-13lk.onrender.com/api'
+const HOSTED_API_URL = 'https://backend-6qf7.onrender.com/api'
 const COLD_START_TIMEOUT_MS = 60000
 const configuredApiUrl = import.meta.env.VITE_API_URL?.trim()
 const isLocalFrontend = ['localhost', '127.0.0.1', '[::1]'].includes(
