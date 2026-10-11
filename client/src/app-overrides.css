@@ -2414,17 +2414,25 @@
 }
 
 @media (max-width: 700px) {
+  .product-detail-shell {
+    padding-bottom: 0;
+  }
+
+  .product-detail-shell .mobile-dock {
+    display: none !important;
+  }
+
   .pd-mobile-sticky-bar {
     right: 12px;
-    bottom: calc(82px + env(safe-area-inset-bottom));
+    bottom: max(10px, env(safe-area-inset-bottom));
     left: 12px;
     z-index: 80;
     border: 1px solid var(--line);
     border-radius: 14px;
   }
 
-  .product-detail-page {
-    padding-bottom: 180px;
+  .product-detail-shell .product-detail-page {
+    padding-bottom: calc(100px + env(safe-area-inset-bottom));
   }
 }
 
@@ -7745,4 +7753,14 @@ body {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
   }
+}
+
+.equipment-card .listing-tag {
+  background: #15803d;
+  color: #fff;
+}
+
+.equipment-card .listing-tag svg {
+  flex-shrink: 0;
+  color: inherit;
 }

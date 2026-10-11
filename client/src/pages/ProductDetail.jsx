@@ -23,10 +23,10 @@ import {
   Wrench,
   X,
 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api'
 import { EquipmentCard } from '../components/MarketplaceComponents'
-import { equipment as mockEquipment } from '../data'
+import { isListingSaved, toggleSavedListing } from '../savedListings'
 import '../product-detail.css'
 
 export function toProductSlug(name) {
@@ -86,17 +86,11 @@ export default function ProductDetail({
   const [feedbackMessage, setFeedbackMessage] = useState('')
   const [feedbackSending, setFeedbackSending] = useState(false)
   const [feedbackError, setFeedbackError] = useState('')
+  const productRequestVersion = useRef(0)
 
-  const [isSaved, setIsSaved] = useState(() => {
-    try {
-      const saved = JSON.parse(
-        localStorage.getItem('equiptrade_saved_items') || '[]'
-      )
-      return item ? saved.includes(item._id || item.id) : false
-    } catch {
-      return false
-    }
-  })
+  const [isSaved, setIsSaved] = useState(() =>
+    isListingSaved(item?._id || item?.id)
+  )
 
   const [enquiryForm, setEnquiryForm] = useState({
     name: user?.name || '',
@@ -118,6 +112,17 @@ export default function ProductDetail({
   }, [user])
 
   useEffect(() => {
+    const syncSavedState = () => {
+      setIsSaved(isListingSaved(item?._id || item?.id))
+    }
+    syncSavedState()
+    window.addEventListener('equiptrade:saved-listings-changed', syncSavedState)
+    return () => {
+      window.removeEventListener('equiptrade:saved-listings-changed', syncSavedState)
+    }
+  }, [item])
+
+  useEffect(() => {
     if (!ratingPending) return undefined
 
     const timeoutId = window.setTimeout(() => {
@@ -134,11 +139,14 @@ export default function ProductDetail({
   const loadProduct = useCallback(async () => {
     if (!slug) return
 
+    const requestId = ++productRequestVersion.current
+
     try {
       setLoading(true)
       setError('')
 
       let found = null
+      let listingsLoaded = false
 
       // First try specific endpoint
       try {
@@ -150,68 +158,82 @@ export default function ProductDetail({
         // Fall back to listing search
       }
 
-      // If not resolved, fetch all approved listings
-      let listings = []
-      try {
+      if (requestId !== productRequestVersion.current) return
+
+      if (!found) {
         const data = await api.getEquipment()
-        if (Array.isArray(data) && data.length) {
-          listings = data
+        if (requestId !== productRequestVersion.current) return
+        if (!Array.isArray(data)) {
+          throw new Error('The marketplace returned an unexpected response.')
         }
-      } catch (err) {
-        console.warn('API getEquipment failed, checking fallback:', err)
-      }
 
-      // If API empty or failed, combine with mock fallback
-      if (!listings.length && Array.isArray(mockEquipment)) {
-        listings = mockEquipment.map(mock => ({
-          ...mock,
-          _id: String(mock.id),
-          images: mock.image ? [mock.image] : [],
-        }))
-      }
-
-      setAllListings(listings)
-
-      if (!found && listings.length) {
-        found = listings.find(listing =>
+        setAllListings(data)
+        listingsLoaded = true
+        found = data.find(listing =>
           matchesProductSlug(listing, slug)
         )
       }
 
-      if (found) {
-        setItem(found)
-        setActiveImage(0)
-      } else {
+      if (!found) {
         setError('Equipment listing not found or has been withdrawn.')
+        return
       }
+
+      setItem(found)
+      setActiveImage(0)
+
+      if (listingsLoaded) return
+
+      api.getEquipment()
+        .then(data => {
+          if (requestId !== productRequestVersion.current) return
+          if (!Array.isArray(data)) {
+            throw new Error('The marketplace returned an unexpected response.')
+          }
+          setAllListings(data)
+        })
+        .catch(error => {
+          if (requestId === productRequestVersion.current) {
+            console.warn('Unable to load related equipment:', error)
+          }
+        })
     } catch (err) {
+      if (requestId !== productRequestVersion.current) return
       console.error('Failed to load equipment detail:', err)
       setError(err.message || 'Unable to load equipment details.')
     } finally {
-      setLoading(false)
+      if (requestId === productRequestVersion.current) {
+        setLoading(false)
+      }
     }
   }, [slug])
 
   useEffect(() => {
     if (!item || !matchesProductSlug(item, slug)) {
       loadProduct()
+      return () => {
+        productRequestVersion.current += 1
+      }
     } else {
       // Background load other listings for related items
+      let active = true
       api.getEquipment()
         .then(data => {
-          if (Array.isArray(data)) setAllListings(data)
+          if (!active) return
+          if (!Array.isArray(data)) {
+            throw new Error('The marketplace returned an unexpected response.')
+          }
+          setAllListings(data)
         })
-        .catch(() => {
-          if (Array.isArray(mockEquipment)) {
-            setAllListings(
-              mockEquipment.map(m => ({
-                ...m,
-                _id: String(m.id),
-                images: m.image ? [m.image] : [],
-              }))
-            )
+        .catch(error => {
+          if (active) {
+            console.warn('Unable to load related equipment:', error)
           }
         })
+
+      return () => {
+        active = false
+      }
     }
   }, [slug, loadProduct])
 
@@ -237,32 +259,16 @@ export default function ProductDetail({
       .slice(0, 3)
   }, [item, allListings])
 
-  const toggleSave = () => {
-    const next = !isSaved
-    setIsSaved(next)
+  const toggleSave = listing => {
     try {
-      const saved = JSON.parse(
-        localStorage.getItem('equiptrade_saved_items') || '[]'
-      )
-      const id = item?._id || item?.id
-      if (next) {
-        if (!saved.includes(id)) saved.push(id)
-        notify?.('Added to your saved listings.')
-      } else {
-        const filtered = saved.filter(i => i !== id)
-        localStorage.setItem(
-          'equiptrade_saved_items',
-          JSON.stringify(filtered)
-        )
-        notify?.('Removed from saved listings.')
-        return
+      const saved = toggleSavedListing(listing?._id || listing?.id)
+      if ((listing?._id || listing?.id) === (item?._id || item?.id)) {
+        setIsSaved(saved)
       }
-      localStorage.setItem(
-        'equiptrade_saved_items',
-        JSON.stringify(saved)
-      )
-    } catch {
-      // LocalStorage access handling
+      notify?.(saved ? 'Added to your saved listings.' : 'Removed from saved listings.')
+    } catch (error) {
+      console.error('Unable to update saved listing:', error)
+      notify?.(error.message || 'Unable to update saved listing.')
     }
   }
 
@@ -300,9 +306,32 @@ export default function ProductDetail({
     }
   }
 
+  const shareListing = () => {
+    if (user) {
+      handleShare()
+    } else {
+      requireVerification?.(handleShare)
+    }
+  }
+
+  const saveListing = listing => {
+    const selectedListing = listing || item
+    if (user) {
+      toggleSave(selectedListing)
+    } else {
+      requireVerification?.(() => toggleSave(selectedListing))
+    }
+  }
+
   const openEnquiry = () => {
     setEnquiryError('')
-    setEnquiryModal(true)
+
+    if (user) {
+      setEnquiryModal(true)
+      return
+    }
+
+    requireVerification?.(() => setEnquiryModal(true))
   }
 
   const sendEnquiry = async () => {
@@ -339,11 +368,7 @@ export default function ProductDetail({
     event.preventDefault()
 
     if (!user) {
-      if (requireVerification) {
-        requireVerification(sendEnquiry)
-      } else {
-        setEnquiryError('Sign in to send an enquiry to this seller.')
-      }
+      setEnquiryError('Sign in to send an enquiry to this seller.')
       return
     }
 
@@ -499,7 +524,7 @@ export default function ProductDetail({
           <button
             type="button"
             className="pd-action-btn"
-            onClick={handleShare}
+            onClick={shareListing}
             title="Share this listing"
           >
             <Share2 size={15} />
@@ -509,7 +534,7 @@ export default function ProductDetail({
           <button
             type="button"
             className={`pd-action-btn ${isSaved ? 'saved' : ''}`}
-            onClick={toggleSave}
+            onClick={saveListing}
             title="Save to watchlist"
           >
             <Heart size={15} fill={isSaved ? '#d13438' : 'none'} />
@@ -691,9 +716,15 @@ export default function ProductDetail({
               type="button"
               className="pd-secondary-btn"
               onClick={() =>
-                notify?.(
-                  'Our equipment specialist will contact you to arrange an inspection.'
-                )
+                user
+                  ? notify?.(
+                      'Our equipment specialist will contact you to arrange an inspection.'
+                    )
+                  : requireVerification?.(() =>
+                      notify?.(
+                        'Our equipment specialist will contact you to arrange an inspection.'
+                      )
+                    )
               }
             >
               <PhoneCall size={16} />
@@ -852,6 +883,7 @@ export default function ProductDetail({
               <EquipmentCard
                 key={rel._id || rel.id}
                 item={rel}
+                onSave={saveListing}
                 onClick={() =>
                   navigate('product-detail', {
                     product: rel,

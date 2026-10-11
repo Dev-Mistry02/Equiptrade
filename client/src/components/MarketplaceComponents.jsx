@@ -1,7 +1,19 @@
 import { ArrowRight, BadgeCheck, Building2, Heart } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { isListingSaved, savedListingsChangedEvent } from '../savedListings'
 
-export function EquipmentCard({ item, onClick }) {
+export function EquipmentCard({ item, onClick, onSave }) {
   const image = item.images?.[0]
+  const listingId = item._id || item.id
+  const [saved, setSaved] = useState(() => isListingSaved(listingId))
+
+  useEffect(() => {
+    const syncSavedState = () => setSaved(isListingSaved(listingId))
+    syncSavedState()
+    window.addEventListener(savedListingsChangedEvent, syncSavedState)
+    return () => window.removeEventListener(savedListingsChangedEvent, syncSavedState)
+  }, [listingId])
+
   return (
     <article
       className="equipment-card"
@@ -10,12 +22,14 @@ export function EquipmentCard({ item, onClick }) {
     >
       <button
         className="heart"
-        aria-label="Save listing"
+        aria-label={saved ? 'Remove saved listing' : 'Save listing'}
+        aria-pressed={saved}
         onClick={e => {
           e.stopPropagation()
+          onSave?.(item)
         }}
       >
-        <Heart size={17} />
+        <Heart size={17} fill={saved ? 'currentColor' : 'none'} />
       </button>
 
       <div className="equipment-image">

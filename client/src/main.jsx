@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import {
   ArrowRight,
@@ -26,6 +26,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { api } from './api'
+import { toggleSavedListing } from './savedListings'
 import { categories, equipment } from './data'
 import HomePage from './pages/Home'
 import BrowsePage from './pages/Browse'
@@ -83,13 +84,10 @@ function isPublicPath(pathname) {
     pathname === '/' ||
     [
       '/home',
-      '/buy',
-      '/sell',
       '/about',
       '/legal-info',
       '/contact',
-    ].includes(pathname) ||
-    Boolean(getProductSlugFromPath(pathname))
+    ].includes(pathname)
   )
 }
 
@@ -134,6 +132,7 @@ function App() {
         ? {
           step: draft.step === 'otp' ? 'otp' : 'details',
           data: draft.data,
+          resendAvailableAt: Number(draft.resendAvailableAt) || 0,
         }
         : {
           step: 'details',
@@ -142,6 +141,7 @@ function App() {
             mobileNumber: '',
             email: '',
           },
+          resendAvailableAt: 0,
         }
     } catch {
       return {
@@ -151,6 +151,7 @@ function App() {
           mobileNumber: '',
           email: '',
         },
+        resendAvailableAt: 0,
       }
     }
   })()
@@ -179,6 +180,12 @@ function App() {
     useState(false)
   const [pendingAction, setPendingAction] = useState(null)
   const [authStep, setAuthStep] = useState(savedAuthDraft.step)
+  const [resendAvailableAt, setResendAvailableAt] = useState(
+    savedAuthDraft.resendAvailableAt
+  )
+  const [resendSeconds, setResendSeconds] = useState(() =>
+    Math.max(0, Math.ceil((savedAuthDraft.resendAvailableAt - Date.now()) / 1000))
+  )
   const [authData, setAuthData] = useState(
     savedAuthDraft.data
   )
@@ -192,6 +199,7 @@ function App() {
   const [cookieConsentAccepted, setCookieConsentAccepted] = useState(
     hasAcceptedCookieConsent
   )
+  const authRequestInFlight = useRef(false)
 
   useEffect(() => {
     const legacyAuthKeys = [
@@ -267,19 +275,37 @@ function App() {
 
   useEffect(() => {
     if (!verified && authData.email) {
-      localStorage.setItem(
-        'equiptrade_auth_draft',
-        JSON.stringify({
-          step: authStep,
-          data: authData,
-        })
-      )
+      try {
+        localStorage.setItem(
+          'equiptrade_auth_draft',
+          JSON.stringify({
+            step: authStep,
+            data: authData,
+            resendAvailableAt,
+          })
+        )
+      } catch (error) {
+        console.warn('Unable to save verification progress on this device:', error)
+      }
     }
   }, [
     authStep,
     authData,
+    resendAvailableAt,
     verified,
   ])
+
+  useEffect(() => {
+    const updateCountdown = () => {
+      setResendSeconds(
+        Math.max(0, Math.ceil((resendAvailableAt - Date.now()) / 1000))
+      )
+    }
+
+    updateCountdown()
+    const interval = window.setInterval(updateCountdown, 1000)
+    return () => window.clearInterval(interval)
+  }, [resendAvailableAt])
 
   useEffect(() => {
     const restoreVerificationStep = () => {
@@ -293,6 +319,7 @@ function App() {
         if (draft?.step === 'otp' && draft.data?.email) {
           setAuthData(draft.data)
           setAuthStep('otp')
+          setResendAvailableAt(Number(draft.resendAvailableAt) || 0)
           setOtp('')
         }
       } catch {
@@ -450,10 +477,11 @@ function App() {
 
   const sendOtp = async event => {
     event.preventDefault()
+    if (authRequestInFlight.current) return
 
+    authRequestInFlight.current = true
     setLoading(true)
     setAuthError('')
-    setOtp('')
 
     try {
       const response = await api.sendOtp({
@@ -468,54 +496,96 @@ function App() {
           email: response.email,
         }))
       }
+      setOtp('')
       setAuthStep('otp')
+      setResendAvailableAt(
+        Date.now() + (Number(response.resendAfterSeconds) || 30) * 1000
+      )
       notify(
         response.email
           ? `Verification code sent to ${response.email}.`
           : 'Verification code sent to your email.'
       )
     } catch (error) {
+      if (error.retryAfterSeconds > 0) {
+        setResendAvailableAt(Date.now() + error.retryAfterSeconds * 1000)
+      }
       setAuthError(
         error.message ||
         'Unable to send the verification code. Please try again.'
       )
     } finally {
+      authRequestInFlight.current = false
       setLoading(false)
     }
   }
 
+  const completeVerification = verifiedUser => {
+    if (!verifiedUser?.id || !verifiedUser.verified) {
+      throw new Error('No verified account was returned. Please try again.')
+    }
+
+    setUser(verifiedUser)
+    setVerified(true)
+    window.dispatchEvent(new Event('equiptrade:session-changed'))
+    try {
+      localStorage.removeItem('equiptrade_auth_draft')
+    } catch (error) {
+      console.warn('Unable to clear saved verification progress:', error)
+    }
+    setResendAvailableAt(0)
+    setAuthStep('details')
+    setAuthData({ name: '', mobileNumber: '', email: '' })
+    setOtp('')
+    setAuthError('')
+    setVerificationOpen(false)
+
+    const action = pendingAction
+    setPendingAction(null)
+    closeVerification()
+    action?.(verifiedUser)
+    notify('Account verified. Welcome to EquipTrade.')
+  }
+
   const verifyOtp = async event => {
     event.preventDefault()
+    if (authRequestInFlight.current) return
 
+    if (!/^\d{6}$/.test(otp)) {
+      setAuthError('Enter the 6-digit verification code.')
+      return
+    }
+
+    authRequestInFlight.current = true
     setLoading(true)
     setAuthError('')
 
     try {
       const response = await api.verifyOtp({
-        email: authData.email,
+        email: authData.email.trim().toLowerCase(),
         otp,
       })
 
-      setUser(response.user)
-      setVerified(true)
-      window.dispatchEvent(new Event('equiptrade:session-changed'))
-      localStorage.removeItem('equiptrade_auth_draft')
-
-      setVerificationOpen(false)
-
-      const action = pendingAction
-      setPendingAction(null)
-
-      closeVerification()
-      action?.()
-
-      notify('Account verified. Welcome to EquipTrade.')
+      completeVerification(response.user)
     } catch (error) {
+      if (!error.status || error.status >= 500) {
+        try {
+          const session = await api.getSession()
+          if (session?.user?.id && session.user.verified) {
+            completeVerification(session.user)
+            return
+          }
+        } catch (sessionError) {
+          console.warn('Unable to reconcile the verification session:', sessionError)
+        }
+      }
+
       setAuthError(
         error.message ||
         'Unable to verify the code. Please try again.'
       )
     } finally {
+      authRequestInFlight.current = false
       setLoading(false)
     }
   }
@@ -538,6 +608,7 @@ function App() {
     setVerificationOpen(false)
     setPendingAction(null)
     setAuthStep('details')
+    setResendAvailableAt(0)
     setAuthData({
       name: '',
       mobileNumber: '',
@@ -612,6 +683,16 @@ function App() {
   }
 
   const guardedNavigate = (nextPage, options = {}) => {
+    const requiresVerification =
+      nextPage === 'browse' ||
+      nextPage === 'sell' ||
+      nextPage === 'product-detail'
+
+    if (requiresVerification && !verified) {
+      requireVerification(() => navigate(nextPage, options))
+      return
+    }
+
     navigate(nextPage, options)
   }
 
@@ -643,10 +724,62 @@ function App() {
   }
 
   const handleProfileClick = () => {
+    if (!verified) {
+      requireVerification(() => setProfileOpen(true))
+      return
+    }
     setProfileOpen(value => !value)
   }
 
-  const requiresSession = page === 'admin' || page === 'verification'
+  const handleSaveListing = item => {
+    const save = () => {
+      try {
+        const saved = toggleSavedListing(item?._id || item?.id)
+        notify(saved ? 'Added to your saved listings.' : 'Removed from saved listings.')
+      } catch (error) {
+        console.error('Unable to update saved listing:', error)
+        notify(error.message || 'Unable to update saved listing.')
+      }
+    }
+
+    requireVerification(save)
+  }
+
+  useEffect(() => {
+    const protectedPage =
+      page === 'browse' ||
+      page === 'sell' ||
+      page === 'product-detail'
+
+    if (!sessionInitialized || verified || !protectedPage) return
+
+    const requestedPage = page
+    const requestedOptions =
+      page === 'product-detail'
+        ? { product: selectedProduct, slug: productSlug }
+        : {}
+
+    setPendingAction(
+      () => () => navigate(requestedPage, requestedOptions)
+    )
+    setPage('home')
+    window.history.replaceState({}, '', pageToPath.verification)
+    setVerificationOpen(true)
+  }, [
+    page,
+    productSlug,
+    selectedProduct,
+    sessionInitialized,
+    verified,
+    navigate,
+  ])
+
+  const requiresSession =
+    page === 'admin' ||
+    page === 'verification' ||
+    page === 'browse' ||
+    page === 'sell' ||
+    page === 'product-detail'
 
   if (!sessionInitialized && (requiresSession || verificationOpen)) {
     return (
@@ -707,7 +840,7 @@ function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${page === 'product-detail' ? ' product-detail-shell' : ''}`}>
       <header className="topbar">
 
         <button
@@ -845,17 +978,6 @@ function App() {
                 onSignIn={() => requireVerification()}
               />
             )}
-            {profileOpen && (
-              <div className="mobile-profile-wrapper">
-                <AccountPanel
-                  user={user}
-                  close={() => setProfileOpen(false)}
-                  onLogout={logout}
-                  onSignIn={() => requireVerification()}
-                />
-              </div>
-            )}
-
           </div>
 
           <button
@@ -950,6 +1072,7 @@ function App() {
       {page === 'home' && (
         <HomePage
           navigate={guardedNavigate}
+          onSaveListing={handleSaveListing}
           setSelected={item => {
             const slug = toProductSlug(item?.name) || item?._id
             guardedNavigate('product-detail', { product: item, slug })
@@ -969,6 +1092,7 @@ function App() {
         <BrowsePage
           search={search}
           setSearch={setSearch}
+          onSaveListing={handleSaveListing}
           setSelected={item => {
             const slug = toProductSlug(item?.name) || item?._id
             guardedNavigate('product-detail', { product: item, slug })
@@ -993,6 +1117,7 @@ function App() {
           notify={notify}
           navigate={guardedNavigate}
           user={user}
+          requireVerification={requireVerification}
         />
       )}
 
@@ -1037,16 +1162,21 @@ function App() {
             data={authData}
             setData={setAuthData}
             otp={otp}
-            setOtp={setOtp}
+            setOtp={value => {
+              setOtp(value)
+              setAuthError('')
+            }}
             onSend={sendOtp}
             onVerify={verifyOtp}
             onChangeEmail={() => {
               setAuthStep('details')
               setOtp('')
               setAuthError('')
+              setResendAvailableAt(0)
             }}
             loading={loading}
             error={authError}
+            resendSeconds={resendSeconds}
           />
         </div>
       )}

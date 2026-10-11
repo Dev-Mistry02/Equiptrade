@@ -92,9 +92,14 @@ async function request(path, options = {}) {
   }
 
   if (!response.ok) {
-    throw new Error(
+    const error = new Error(
       data.message || 'Something went wrong'
     )
+    error.status = response.status
+    error.retryAfterSeconds = Number(
+      data.retryAfterSeconds || response.headers.get('Retry-After')
+    ) || 0
+    throw error
   }
 
   return data
@@ -134,7 +139,7 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 
-  getEquipment: filters => {
+  getEquipment: (filters, options = {}) => {
     const params = new URLSearchParams()
 
     if (
@@ -165,7 +170,10 @@ export const api = {
 
     return request(
       `/equipment${query ? `?${query}` : ''}`,
-      { timeoutMs: COLD_START_TIMEOUT_MS }
+      {
+        timeoutMs: COLD_START_TIMEOUT_MS,
+        ...options,
+      }
     )
   },
 

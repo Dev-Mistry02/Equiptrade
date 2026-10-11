@@ -21,6 +21,8 @@ import {
 const router = Router()
 
 const OTP_DURATION_MS = 10 * 60 * 1000
+const OTP_RESEND_COOLDOWN_MS = 30 * 1000
+const OTP_MAX_ATTEMPTS = 5
 
 const hashOtp = otp =>
   crypto.createHash('sha256').update(otp).digest('hex')
@@ -117,8 +119,6 @@ router.post('/admin-logout', (_req, res) => {
 
 // Send email OTP
 router.post('/send-otp', async (req, res) => {
-  let user = null
-
   try {
     const name = String(req.body.name || '').trim()
     const mobileNumber = String(
@@ -132,11 +132,16 @@ router.post('/send-otp', async (req, res) => {
       })
     }
 
-    user = await User.findOne({ email })
-      .select('+otpHash +otpExpiresAt')
-
+    let user = await User.findOne({ email }).select('+otpLastSentAt')
     if (!user) {
       user = new User({ name, mobileNumber, email })
+      try {
+        await user.save()
+      } catch (error) {
+        if (error.code !== 11000) throw error
+        user = await User.findOne({ email }).select('+otpLastSentAt')
+        if (!user) throw error
+      }
     }
 
     const otp = String(
@@ -144,47 +149,71 @@ router.post('/send-otp', async (req, res) => {
     )
 
     const otpHash = hashOtp(otp)
-
-    user.otpHash = otpHash
-    user.otpExpiresAt = new Date(
-      Date.now() + OTP_DURATION_MS
+    const sentAt = new Date()
+    const expiresAt = new Date(sentAt.getTime() + OTP_DURATION_MS)
+    const cooldownThreshold = new Date(
+      sentAt.getTime() - OTP_RESEND_COOLDOWN_MS
     )
-    user.pendingName = name
-    user.pendingMobileNumber = mobileNumber
+    const reservedUser = await User.findOneAndUpdate(
+      {
+        _id: user._id,
+        $or: [
+          { otpLastSentAt: { $exists: false } },
+          { otpLastSentAt: null },
+          { otpLastSentAt: { $lte: cooldownThreshold } },
+        ],
+      },
+      {
+        $set: {
+          otpHash,
+          otpExpiresAt: expiresAt,
+          otpLastSentAt: sentAt,
+          pendingName: name,
+          pendingMobileNumber: mobileNumber,
+          otpAttempts: 0,
+        },
+      },
+      { new: true }
+    )
 
-    try {
-      await user.save()
-    } catch (error) {
-      if (error.code !== 11000) {
-        throw error
-      }
+    if (!reservedUser) {
+      const latestUser = await User.findById(user._id)
+        .select('+otpLastSentAt')
+      const retryAfterSeconds = latestUser?.otpLastSentAt
+        ? Math.max(
+          1,
+          Math.ceil(
+            (latestUser.otpLastSentAt.getTime() +
+              OTP_RESEND_COOLDOWN_MS -
+              Date.now()) / 1000
+          )
+        )
+        : 1
 
-      user = await User.findOne({ email })
-        .select('+otpHash +otpExpiresAt')
-
-      if (!user) {
-        throw error
-      }
-
-      user.otpHash = otpHash
-      user.otpExpiresAt = new Date(
-        Date.now() + OTP_DURATION_MS
-      )
-      user.pendingName = name
-      user.pendingMobileNumber = mobileNumber
-
-      await user.save()
+      res.set('Retry-After', String(retryAfterSeconds))
+      return res.status(429).json({
+        message: `Please wait ${retryAfterSeconds} seconds before requesting another code.`,
+        retryAfterSeconds,
+      })
     }
 
     try {
-      await sendOtpEmail(user.email, name, otp)
+      await sendOtpEmail(email, name, otp)
     } catch (mailError) {
-      user.otpHash = undefined
-      user.otpExpiresAt = undefined
-      user.pendingName = undefined
-      user.pendingMobileNumber = undefined
       try {
-        await user.save()
+        await User.updateOne(
+          { _id: reservedUser._id, otpHash },
+          {
+            $unset: {
+              otpHash: '',
+              otpExpiresAt: '',
+              otpLastSentAt: '',
+              pendingName: '',
+              pendingMobileNumber: '',
+            },
+            $set: { otpAttempts: 0 },
+          }
+        )
       } catch (cleanupError) {
         console.error('Failed to clear undelivered OTP:', cleanupError.message)
       }
@@ -194,7 +223,9 @@ router.post('/send-otp', async (req, res) => {
 
     return res.json({
       message: 'Verification code sent to your email.',
-      email: user.email,
+      email,
+      expiresInSeconds: OTP_DURATION_MS / 1000,
+      resendAfterSeconds: OTP_RESEND_COOLDOWN_MS / 1000,
     })
   } catch (error) {
     console.error('Failed to send account verification code:', {
@@ -240,7 +271,7 @@ router.post('/verify-otp', async (req, res) => {
     }
 
     const user = await User.findOne({ email })
-      .select('+otpHash +otpExpiresAt +pendingName +pendingMobileNumber')
+      .select('+otpHash +otpExpiresAt +pendingName +pendingMobileNumber +otpAttempts')
 
     if (
       !user?.otpHash ||
@@ -260,23 +291,71 @@ router.post('/verify-otp', async (req, res) => {
       submittedHash.length !== storedHash.length ||
       !crypto.timingSafeEqual(submittedHash, storedHash)
     ) {
+      const failedAttempt = await User.findOneAndUpdate(
+        {
+          _id: user._id,
+          otpHash: user.otpHash,
+          otpExpiresAt: { $gt: new Date() },
+          otpAttempts: { $lt: OTP_MAX_ATTEMPTS },
+        },
+        { $inc: { otpAttempts: 1 } },
+        { new: true }
+      ).select('+otpAttempts')
+
+      if (!failedAttempt) {
+        const latestUser = await User.findById(user._id)
+          .select('+otpHash +otpAttempts')
+
+        if (latestUser?.otpHash === user.otpHash &&
+          latestUser.otpAttempts >= OTP_MAX_ATTEMPTS) {
+          await User.updateOne(
+            { _id: latestUser._id, otpHash: user.otpHash },
+            {
+              $unset: {
+                otpHash: '',
+                otpExpiresAt: '',
+                otpLastSentAt: '',
+                pendingName: '',
+                pendingMobileNumber: '',
+              },
+              $set: { otpAttempts: 0 },
+            }
+          )
+
+          return res.status(400).json({
+            message: 'Too many incorrect codes. Request a new verification code.',
+          })
+        }
+
+        return res.status(400).json({
+          message: 'Your verification code changed or expired. Request a new code and try again.',
+        })
+      }
+
+      if (failedAttempt.otpAttempts >= OTP_MAX_ATTEMPTS) {
+        await User.updateOne(
+          { _id: failedAttempt._id, otpHash: user.otpHash },
+          {
+            $unset: {
+              otpHash: '',
+              otpExpiresAt: '',
+              otpLastSentAt: '',
+              pendingName: '',
+              pendingMobileNumber: '',
+            },
+            $set: { otpAttempts: 0 },
+          }
+        )
+
+        return res.status(400).json({
+          message: 'Too many incorrect codes. Request a new verification code.',
+        })
+      }
+
       return res.status(400).json({
-        message:
-          'Invalid or expired verification code. Request a new code.',
+        message: `Incorrect verification code. ${OTP_MAX_ATTEMPTS - failedAttempt.otpAttempts} attempt${OTP_MAX_ATTEMPTS - failedAttempt.otpAttempts === 1 ? '' : 's'} remaining.`,
       })
     }
-
-    // Consume the OTP after successful verification.
-    user.name = user.pendingName || user.name
-    user.mobileNumber =
-      user.pendingMobileNumber || user.mobileNumber
-    user.verified = true
-    user.otpHash = undefined
-    user.otpExpiresAt = undefined
-    user.pendingName = undefined
-    user.pendingMobileNumber = undefined
-
-    await user.save()
 
     const secret = env.jwtSecret
 
@@ -288,11 +367,46 @@ router.post('/verify-otp', async (req, res) => {
       })
     }
 
+    // Consume the OTP after successful verification.
+    const verifiedUser = await User.findOneAndUpdate(
+      {
+        _id: user._id,
+        otpHash: user.otpHash,
+        otpExpiresAt: { $gt: new Date() },
+        $or: [
+          { otpAttempts: { $lt: OTP_MAX_ATTEMPTS } },
+          { otpAttempts: { $exists: false } },
+        ],
+      },
+      {
+        $set: {
+          name: user.pendingName || user.name,
+          mobileNumber: user.pendingMobileNumber || user.mobileNumber,
+          verified: true,
+          otpAttempts: 0,
+        },
+        $unset: {
+          otpHash: '',
+          otpExpiresAt: '',
+          otpLastSentAt: '',
+          pendingName: '',
+          pendingMobileNumber: '',
+        },
+      },
+      { new: true }
+    )
+
+    if (!verifiedUser) {
+      return res.status(400).json({
+        message: 'This verification code has expired or was already used. Request a new code.',
+      })
+    }
+
     const token = jwt.sign(
       {
-        id: String(user._id),
-        userId: String(user._id),
-        email: user.email,
+        id: String(verifiedUser._id),
+        userId: String(verifiedUser._id),
+        email: verifiedUser.email,
       },
       secret,
       { expiresIn: '30d' }
@@ -301,11 +415,11 @@ router.post('/verify-otp', async (req, res) => {
     res.cookie(USER_SESSION_COOKIE, token, sessionCookieOptions)
     return res.json({
       user: {
-        id: String(user._id),
-        name: user.name,
-        email: user.email,
-        mobileNumber: user.mobileNumber,
-        verified: user.verified,
+        id: String(verifiedUser._id),
+        name: verifiedUser.name,
+        email: verifiedUser.email,
+        mobileNumber: verifiedUser.mobileNumber,
+        verified: verifiedUser.verified,
       },
     })
   } catch (error) {

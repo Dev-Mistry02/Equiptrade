@@ -6,7 +6,7 @@ import {
   SlidersHorizontal,
   X,
 } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import { EquipmentCard } from '../components/MarketplaceComponents'
 import { categories } from '../data'
@@ -16,6 +16,7 @@ export default function Browse({
   search,
   setSearch,
   setSelected,
+  onSaveListing,
   navigate,
 }) {
   const [equipment, setEquipment] = useState([])
@@ -31,6 +32,8 @@ export default function Browse({
   })
 
   const [showFilters, setShowFilters] = useState(false)
+  const requestVersion = useRef(0)
+  const activeRequest = useRef(null)
   
   const priceRange = (() => {
     const prices = equipment
@@ -53,29 +56,40 @@ export default function Browse({
   /*
    * Fetch marketplace data
    */
-  const fetchEquipment = useCallback(async () => {
-    const requestId = Date.now()
+  const fetchEquipment = useCallback(async ({ showLoading = true } = {}) => {
+    const requestId = ++requestVersion.current
+    activeRequest.current?.abort()
+
+    const controller = new AbortController()
+    activeRequest.current = controller
 
     try {
       setError('')
-      setLoading(true)
+      if (showLoading) setLoading(true)
 
       const data = await api.getEquipment({
         search,
         ...filters,
-        _t: requestId,
+      }, {
+        signal: controller.signal,
       })
+
+      if (requestId !== requestVersion.current) return
 
       if (Array.isArray(data)) {
         setEquipment(data)
       } else {
-        setEquipment([])
+        throw new Error('The marketplace returned an unexpected response.')
       }
     } catch (error) {
+      if (requestId !== requestVersion.current) return
       console.error('Failed to load marketplace:', error)
       setError(error.message || 'Unable to load marketplace.')
     } finally {
-      setLoading(false)
+      if (requestId === requestVersion.current) {
+        activeRequest.current = null
+        setLoading(false)
+      }
     }
   }, [search, filters])
 
@@ -89,7 +103,11 @@ export default function Browse({
       fetchEquipment()
     }, 250)
 
-    return () => clearTimeout(timer)
+    return () => {
+      clearTimeout(timer)
+      requestVersion.current += 1
+      activeRequest.current?.abort()
+    }
   }, [fetchEquipment])
 
   /*
@@ -98,12 +116,8 @@ export default function Browse({
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        fetchEquipment()
+        fetchEquipment({ showLoading: false })
       }
-    }
-
-    const handleFocus = () => {
-      fetchEquipment()
     }
 
     document.addEventListener(
@@ -111,15 +125,11 @@ export default function Browse({
       handleVisibilityChange
     )
 
-    window.addEventListener('focus', handleFocus)
-
     return () => {
       document.removeEventListener(
         'visibilitychange',
         handleVisibilityChange
       )
-
-      window.removeEventListener('focus', handleFocus)
     }
   }, [fetchEquipment])
 
@@ -129,7 +139,7 @@ export default function Browse({
   useEffect(() => {
     const interval = setInterval(() => {
       if (document.visibilityState === 'visible') {
-        fetchEquipment()
+        fetchEquipment({ showLoading: false })
       }
     }, 60000)
 
@@ -484,6 +494,7 @@ export default function Browse({
                     <EquipmentCard
                       item={item}
                       key={item._id}
+                      onSave={onSaveListing}
                       onClick={() => {
                         const slug = toProductSlug(item.name) || item._id
                         navigate('product-detail', {

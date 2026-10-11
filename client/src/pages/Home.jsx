@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api'
 import { EquipmentCard, Process, SectionHeading } from '../components/MarketplaceComponents'
 
-export default function Home({ navigate, setSelected, search, setSearch }) {
+export default function Home({ navigate, setSelected, onSaveListing, search, setSearch }) {
   const [equipment, setEquipment] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -91,7 +91,7 @@ export default function Home({ navigate, setSelected, search, setSearch }) {
         <div className="container">
           <SectionHeading eyebrow="Inspected. Approved. Ready." title="Recently verified" link="Browse all equipment" onClick={() => navigate('browse')} />
           <p className="home-section-intro">A closer look at equipment that has passed our review.</p>
-          {loading ? <p className="home-state">Loading listings...</p> : error ? <div className="home-state"><p className="data-error">{error}</p><button className="button button-dark" onClick={loadEquipment}>Try again</button></div> : equipment.length ? <div className="listing-grid">{equipment.slice(0, 3).map(item => <EquipmentCard item={item} key={item._id} onClick={() => setSelected(item)} />)}</div> : <p className="home-state">No approved equipment yet.</p>}
+          {loading ? <p className="home-state">Loading listings...</p> : error ? <div className="home-state"><p className="data-error">{error}</p><button className="button button-dark" onClick={loadEquipment}>Try again</button></div> : equipment.length ? <div className="listing-grid">{equipment.slice(0, 3).map(item => <EquipmentCard item={item} key={item._id} onClick={() => setSelected(item)} onSave={onSaveListing} />)}</div> : <p className="home-state">No approved equipment yet.</p>}
         </div>
       </section>
 

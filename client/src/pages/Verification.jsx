@@ -18,6 +18,7 @@ export default function Verification({
   onChangeEmail,
   loading,
   error,
+  resendSeconds,
 }) {
   return (
     <main className="verification-page">
@@ -69,6 +70,7 @@ export default function Verification({
                   <input
                     required
                     value={data.name}
+                    autoComplete="name"
                     onChange={event => setData(current => ({ ...current, name: event.target.value }))}
                     placeholder="Your full name"
                   />
@@ -79,6 +81,8 @@ export default function Verification({
                   <input
                     required
                     type="tel"
+                    autoComplete="tel"
+                    inputMode="tel"
                     value={data.mobileNumber}
                     onChange={event => setData(current => ({ ...current, mobileNumber: event.target.value }))}
                     placeholder="Your mobile number"
@@ -90,6 +94,7 @@ export default function Verification({
                   <input
                     required
                     type="email"
+                    autoComplete="email"
                     value={data.email}
                     onChange={event => setData(current => ({ ...current, email: event.target.value }))}
                     placeholder="you@company.com"
@@ -129,12 +134,14 @@ export default function Verification({
                 <input
                   className="otp-input"
                   inputMode="numeric"
+                  autoComplete="one-time-code"
                   maxLength={6}
+                  minLength={6}
+                  pattern="[0-9]{6}"
                   required
                   value={otp}
-                  onChange={event => setOtp(event.target.value.replace(/\D/g, ''))}
+                  onChange={event => setOtp(event.target.value.replace(/\D/g, '').slice(0, 6))}
                   placeholder="000000"
-                  autoFocus
                 />
 
                 {error && <p className="verification-error" role="alert">{error}</p>}
@@ -153,9 +160,14 @@ export default function Verification({
                 type="button"
                 className="resend"
                 onClick={onSend}
-                disabled={loading}
+                disabled={loading || resendSeconds > 0}
               >
-                Didn’t receive it? <strong>Resend code</strong>
+                Didn’t receive it?{' '}
+                <strong>
+                  {resendSeconds > 0
+                    ? `Resend in ${resendSeconds}s`
+                    : 'Resend code'}
+                </strong>
               </button>
             </>
           )}

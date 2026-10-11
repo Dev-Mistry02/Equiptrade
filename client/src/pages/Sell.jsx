@@ -117,6 +117,7 @@ export default function Sell({
   notify,
   navigate,
   user,
+  requireVerification,
 }) {
   const [step, setStep] = useState(1)
   const [submitted, setSubmitted] = useState(false)
@@ -295,9 +296,7 @@ export default function Sell({
   // SUBMIT
   // =========================================================
 
-  const submit = async event => {
-    event.preventDefault()
-
+  const submitListing = async authenticatedUser => {
     try {
       // -----------------------------------------------------
       // VALIDATE FORM
@@ -331,10 +330,10 @@ export default function Sell({
         return
       }
 
-      if (!user?.id) {
-        setError(
-          'Please sign in from your account before submitting equipment.'
-        )
+      const seller = authenticatedUser || user
+
+      if (!seller?.id) {
+        setError('Please sign in before submitting equipment.')
         return
       }
 
@@ -358,7 +357,7 @@ export default function Sell({
       const response =
         await api.submitEquipment({
           ...parsed.data,
-          seller: user.id,
+          seller: seller.id,
           images: cloudinaryImages,
         })
 
@@ -377,6 +376,21 @@ export default function Sell({
     } finally {
       setSubmitting(false)
     }
+  }
+
+  const submit = event => {
+    event.preventDefault()
+
+    if (!user?.id) {
+      if (requireVerification) {
+        requireVerification(submitListing)
+      } else {
+        setError('Please sign in before submitting equipment.')
+      }
+      return
+    }
+
+    submitListing(user)
   }
 
   // =========================================================
