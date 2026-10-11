@@ -41,7 +41,17 @@ const userSchema = new mongoose.Schema(
       select: false,
     },
 
+    previousOtpHash: {
+      type: String,
+      select: false,
+    },
+
     otpExpiresAt: {
+      type: Date,
+      select: false,
+    },
+
+    previousOtpExpiresAt: {
       type: Date,
       select: false,
     },

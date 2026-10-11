@@ -132,14 +132,18 @@ router.post('/send-otp', async (req, res) => {
       })
     }
 
-    let user = await User.findOne({ email }).select('+otpLastSentAt')
+    let user = await User.findOne({ email }).select(
+      '+otpLastSentAt +otpHash +otpExpiresAt +previousOtpHash +previousOtpExpiresAt +otpAttempts'
+    )
     if (!user) {
       user = new User({ name, mobileNumber, email })
       try {
         await user.save()
       } catch (error) {
         if (error.code !== 11000) throw error
-        user = await User.findOne({ email }).select('+otpLastSentAt')
+        user = await User.findOne({ email }).select(
+          '+otpLastSentAt +otpHash +otpExpiresAt +previousOtpHash +previousOtpExpiresAt +otpAttempts'
+        )
         if (!user) throw error
       }
     }
@@ -151,9 +155,43 @@ router.post('/send-otp', async (req, res) => {
     const otpHash = hashOtp(otp)
     const sentAt = new Date()
     const expiresAt = new Date(sentAt.getTime() + OTP_DURATION_MS)
+    const previousOtp = user.otpHash &&
+      user.otpExpiresAt?.getTime() > sentAt.getTime()
+      ? { hash: user.otpHash, expiresAt: user.otpExpiresAt }
+      : user.previousOtpHash &&
+          user.previousOtpExpiresAt?.getTime() > sentAt.getTime()
+        ? {
+          hash: user.previousOtpHash,
+          expiresAt: user.previousOtpExpiresAt,
+        }
+        : null
     const cooldownThreshold = new Date(
       sentAt.getTime() - OTP_RESEND_COOLDOWN_MS
     )
+    const otpUpdate = {
+      $set: {
+        otpHash,
+        otpExpiresAt: expiresAt,
+        otpLastSentAt: sentAt,
+        pendingName: name,
+        pendingMobileNumber: mobileNumber,
+        otpAttempts: previousOtp ? user.otpAttempts || 0 : 0,
+        ...(previousOtp
+          ? {
+            previousOtpHash: previousOtp.hash,
+            previousOtpExpiresAt: previousOtp.expiresAt,
+          }
+          : {}),
+      },
+    }
+
+    if (!previousOtp) {
+      otpUpdate.$unset = {
+        previousOtpHash: '',
+        previousOtpExpiresAt: '',
+      }
+    }
+
     const reservedUser = await User.findOneAndUpdate(
       {
         _id: user._id,
@@ -163,16 +201,7 @@ router.post('/send-otp', async (req, res) => {
           { otpLastSentAt: { $lte: cooldownThreshold } },
         ],
       },
-      {
-        $set: {
-          otpHash,
-          otpExpiresAt: expiresAt,
-          otpLastSentAt: sentAt,
-          pendingName: name,
-          pendingMobileNumber: mobileNumber,
-          otpAttempts: 0,
-        },
-      },
+      otpUpdate,
       { new: true }
     )
 
@@ -201,9 +230,20 @@ router.post('/send-otp', async (req, res) => {
       await sendOtpEmail(email, name, otp)
     } catch (mailError) {
       try {
-        await User.updateOne(
-          { _id: reservedUser._id, otpHash },
-          {
+        const recoveryUpdate = previousOtp
+          ? {
+            $set: {
+              otpHash: previousOtp.hash,
+              otpExpiresAt: previousOtp.expiresAt,
+              otpAttempts: user.otpAttempts || 0,
+            },
+            $unset: {
+              previousOtpHash: '',
+              previousOtpExpiresAt: '',
+              otpLastSentAt: '',
+            },
+          }
+          : {
             $unset: {
               otpHash: '',
               otpExpiresAt: '',
@@ -213,7 +253,8 @@ router.post('/send-otp', async (req, res) => {
             },
             $set: { otpAttempts: 0 },
           }
-        )
+
+        await User.updateOne({ _id: reservedUser._id, otpHash }, recoveryUpdate)
       } catch (cleanupError) {
         console.error('Failed to clear undelivered OTP:', cleanupError.message)
       }
@@ -271,13 +312,31 @@ router.post('/verify-otp', async (req, res) => {
     }
 
     const user = await User.findOne({ email })
-      .select('+otpHash +otpExpiresAt +pendingName +pendingMobileNumber +otpAttempts')
+      .select(
+        '+otpHash +otpExpiresAt +previousOtpHash +previousOtpExpiresAt +pendingName +pendingMobileNumber +otpAttempts'
+      )
 
-    if (
-      !user?.otpHash ||
-      !user.otpExpiresAt ||
-      user.otpExpiresAt.getTime() <= Date.now()
-    ) {
+    const now = new Date()
+    const activeOtpHashes = [
+      user?.otpHash && user.otpExpiresAt?.getTime() > now.getTime()
+        ? {
+          hash: user.otpHash,
+          field: 'otpHash',
+          expiryField: 'otpExpiresAt',
+        }
+        : null,
+      user?.previousOtpHash &&
+        user.previousOtpExpiresAt?.getTime() > now.getTime()
+        ? {
+          hash: user.previousOtpHash,
+          expiresAt: user.previousOtpExpiresAt,
+          field: 'previousOtpHash',
+          expiryField: 'previousOtpExpiresAt',
+        }
+        : null,
+    ].filter(Boolean)
+
+    if (!activeOtpHashes.length) {
       return res.status(400).json({
         message:
           'Invalid or expired verification code. Request a new code.',
@@ -285,18 +344,25 @@ router.post('/verify-otp', async (req, res) => {
     }
 
     const submittedHash = Buffer.from(hashOtp(otp), 'hex')
-    const storedHash = Buffer.from(user.otpHash, 'hex')
+    const matchedOtp = activeOtpHashes.find(({ hash }) => {
+      const storedHash = Buffer.from(hash, 'hex')
+      return submittedHash.length === storedHash.length &&
+        crypto.timingSafeEqual(submittedHash, storedHash)
+    })
 
-    if (
-      submittedHash.length !== storedHash.length ||
-      !crypto.timingSafeEqual(submittedHash, storedHash)
-    ) {
+    const activeOtpConditions = activeOtpHashes.map(
+      ({ hash, field, expiryField }) => ({
+        [field]: hash,
+        [expiryField]: { $gt: now },
+      })
+    )
+
+    if (!matchedOtp) {
       const failedAttempt = await User.findOneAndUpdate(
         {
           _id: user._id,
-          otpHash: user.otpHash,
-          otpExpiresAt: { $gt: new Date() },
           otpAttempts: { $lt: OTP_MAX_ATTEMPTS },
+          $or: activeOtpConditions,
         },
         { $inc: { otpAttempts: 1 } },
         { new: true }
@@ -304,15 +370,21 @@ router.post('/verify-otp', async (req, res) => {
 
       if (!failedAttempt) {
         const latestUser = await User.findById(user._id)
-          .select('+otpHash +otpAttempts')
+          .select('+otpHash +previousOtpHash +otpAttempts')
 
-        if (latestUser?.otpHash === user.otpHash &&
-          latestUser.otpAttempts >= OTP_MAX_ATTEMPTS) {
+        if (latestUser?.otpAttempts >= OTP_MAX_ATTEMPTS) {
           await User.updateOne(
-            { _id: latestUser._id, otpHash: user.otpHash },
+            {
+              _id: latestUser._id,
+              $or: activeOtpHashes.map(({ hash, field }) => ({
+                [field]: hash,
+              })),
+            },
             {
               $unset: {
                 otpHash: '',
+                previousOtpHash: '',
+                previousOtpExpiresAt: '',
                 otpExpiresAt: '',
                 otpLastSentAt: '',
                 pendingName: '',
@@ -334,10 +406,17 @@ router.post('/verify-otp', async (req, res) => {
 
       if (failedAttempt.otpAttempts >= OTP_MAX_ATTEMPTS) {
         await User.updateOne(
-          { _id: failedAttempt._id, otpHash: user.otpHash },
+          {
+            _id: failedAttempt._id,
+            $or: activeOtpHashes.map(({ hash, field }) => ({
+              [field]: hash,
+            })),
+          },
           {
             $unset: {
               otpHash: '',
+              previousOtpHash: '',
+              previousOtpExpiresAt: '',
               otpExpiresAt: '',
               otpLastSentAt: '',
               pendingName: '',
@@ -368,14 +447,21 @@ router.post('/verify-otp', async (req, res) => {
     }
 
     // Consume the OTP after successful verification.
+    const matchedOtpCondition = {
+      [matchedOtp.field]: matchedOtp.hash,
+      [matchedOtp.expiryField]: { $gt: new Date() },
+    }
     const verifiedUser = await User.findOneAndUpdate(
       {
         _id: user._id,
-        otpHash: user.otpHash,
-        otpExpiresAt: { $gt: new Date() },
-        $or: [
-          { otpAttempts: { $lt: OTP_MAX_ATTEMPTS } },
-          { otpAttempts: { $exists: false } },
+        $and: [
+          matchedOtpCondition,
+          {
+            $or: [
+              { otpAttempts: { $lt: OTP_MAX_ATTEMPTS } },
+              { otpAttempts: { $exists: false } },
+            ],
+          },
         ],
       },
       {
@@ -387,6 +473,8 @@ router.post('/verify-otp', async (req, res) => {
         },
         $unset: {
           otpHash: '',
+          previousOtpHash: '',
+          previousOtpExpiresAt: '',
           otpExpiresAt: '',
           otpLastSentAt: '',
           pendingName: '',
