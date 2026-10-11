@@ -25,7 +25,7 @@ import {
   X,
   Zap,
 } from 'lucide-react'
-import { api } from './api'
+import { API_URL, api } from './api'
 import { toggleSavedListing } from './savedListings'
 import { categories, equipment } from './data'
 import HomePage from './pages/Home'
@@ -130,9 +130,15 @@ function App() {
 
       return draft?.data?.email
         ? {
-          step: draft.step === 'otp' ? 'otp' : 'details',
+          step:
+            draft.step === 'otp' && draft.apiUrl === API_URL
+              ? 'otp'
+              : 'details',
           data: draft.data,
-          resendAvailableAt: Number(draft.resendAvailableAt) || 0,
+          resendAvailableAt:
+            draft.apiUrl === API_URL
+              ? Number(draft.resendAvailableAt) || 0
+              : 0,
         }
         : {
           step: 'details',
@@ -282,6 +288,7 @@ function App() {
             step: authStep,
             data: authData,
             resendAvailableAt,
+            apiUrl: API_URL,
           })
         )
       } catch (error) {
@@ -318,8 +325,13 @@ function App() {
 
         if (draft?.step === 'otp' && draft.data?.email) {
           setAuthData(draft.data)
-          setAuthStep('otp')
-          setResendAvailableAt(Number(draft.resendAvailableAt) || 0)
+          const draftMatchesCurrentApi = draft.apiUrl === API_URL
+          setAuthStep(draftMatchesCurrentApi ? 'otp' : 'details')
+          setResendAvailableAt(
+            draftMatchesCurrentApi
+              ? Number(draft.resendAvailableAt) || 0
+              : 0
+          )
           setOtp('')
         }
       } catch {

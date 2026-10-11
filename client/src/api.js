@@ -23,7 +23,7 @@ const baseApiUrl = useDevelopmentProxy
   : configuredApiUrl && (isLocalFrontend || !configuredApiIsLocal)
     ? configuredApiUrl
     : HOSTED_API_URL
-const API_URL = useDevelopmentProxy
+export const API_URL = useDevelopmentProxy
   ? '/api'
   : baseApiUrl.endsWith('/api')
     ? baseApiUrl.replace(/\/+$/, '')
