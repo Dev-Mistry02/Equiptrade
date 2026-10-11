@@ -301,15 +301,11 @@ export default function ProductDetail({
   }
 
   const openEnquiry = () => {
-    if (requireVerification) {
-      requireVerification(() => setEnquiryModal(true))
-    } else {
-      setEnquiryModal(true)
-    }
+    setEnquiryError('')
+    setEnquiryModal(true)
   }
 
-  const submitEnquiry = async event => {
-    event.preventDefault()
+  const sendEnquiry = async () => {
     setEnquirySending(true)
     setEnquiryError('')
 
@@ -337,6 +333,21 @@ export default function ProductDetail({
     } finally {
       setEnquirySending(false)
     }
+  }
+
+  const submitEnquiry = event => {
+    event.preventDefault()
+
+    if (!user) {
+      if (requireVerification) {
+        requireVerification(sendEnquiry)
+      } else {
+        setEnquiryError('Sign in to send an enquiry to this seller.')
+      }
+      return
+    }
+
+    sendEnquiry()
   }
 
   const submitServiceFeedback = async event => {
@@ -941,13 +952,7 @@ export default function ProductDetail({
             </div>
 
             <form className="pd-modal-form" onSubmit={submitEnquiry}>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: 12,
-                }}
-              >
+              <div className="pd-enquiry-contact-fields">
                 <label>
                   Your Name
                   <input
@@ -978,16 +983,23 @@ export default function ProductDetail({
                 </label>
               </div>
 
-              <label>
-                Email Address
-                <input
-                  type="email"
-                  required
-                  value={enquiryForm.email}
-                  readOnly
-                  placeholder="Enter email address"
-                />
-              </label>
+              {user ? (
+                <label>
+                  Email Address
+                  <input
+                    type="email"
+                    required
+                    value={user.email || enquiryForm.email}
+                    readOnly
+                    placeholder="Enter email address"
+                  />
+                </label>
+              ) : (
+                <p className="pd-enquiry-signin-note">
+                  Sign in is only needed when you send your enquiry. Your message
+                  will stay ready while you verify your email.
+                </p>
+              )}
 
               <label>
                 Message for Seller
@@ -1014,7 +1026,7 @@ export default function ProductDetail({
                   </>
                 ) : (
                   <>
-                    Send Enquiry to Seller
+                    {user ? 'Send Enquiry to Seller' : 'Sign in & Send Enquiry'}
                     <ArrowRight size={16} />
                   </>
                 )}

@@ -117,7 +117,6 @@ export default function Sell({
   notify,
   navigate,
   user,
-  requireVerification,
 }) {
   const [step, setStep] = useState(1)
   const [submitted, setSubmitted] = useState(false)
@@ -299,11 +298,6 @@ export default function Sell({
   const submit = async event => {
     event.preventDefault()
 
-    if (!user?.id) {
-      requireVerification?.(() => {})
-      return
-    }
-
     try {
       // -----------------------------------------------------
       // VALIDATE FORM
@@ -334,6 +328,13 @@ export default function Sell({
           } selected.`
         )
 
+        return
+      }
+
+      if (!user?.id) {
+        setError(
+          'Please sign in from your account before submitting equipment.'
+        )
         return
       }
 

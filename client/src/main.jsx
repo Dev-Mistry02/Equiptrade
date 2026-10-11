@@ -643,17 +643,7 @@ function App() {
   }
 
   const handleProfileClick = () => {
-    const authenticated = verified
-
-    if (authenticated) {
-      setProfileOpen(
-        value => !value
-      )
-
-      return
-    }
-
-    requireVerification(() => setProfileOpen(true))
+    setProfileOpen(value => !value)
   }
 
   const requiresSession = page === 'admin' || page === 'verification'
@@ -834,11 +824,7 @@ function App() {
 
             <button
               className="avatar-btn"
-              aria-label={
-                verified
-                  ? 'Open profile'
-                  : 'Log in to view profile'
-              }
+              aria-label="Open account"
               aria-expanded={
                 profileOpen
               }
@@ -856,6 +842,7 @@ function App() {
                   setProfileOpen(false)
                 }
                 onLogout={logout}
+                onSignIn={() => requireVerification()}
               />
             )}
             {profileOpen && (
@@ -864,6 +851,7 @@ function App() {
                   user={user}
                   close={() => setProfileOpen(false)}
                   onLogout={logout}
+                  onSignIn={() => requireVerification()}
                 />
               </div>
             )}
@@ -904,9 +892,9 @@ function App() {
         <div className="mobile-profile-card">
           <div className="mobile-profile-header">
             <div>
-              <h3>{user?.name || 'My Account'}</h3>
+              <h3>{user?.name || 'Your Account'}</h3>
               <p>
-                {user?.email || user?.mobileNumber || ''}
+                {user?.email || 'Sign in to manage your account'}
               </p>
             </div>
 
@@ -920,32 +908,42 @@ function App() {
             </button>
           </div>
 
-          <div className="mobile-profile-info">
-            <div className="mobile-profile-row">
-              <span>Name</span>
-              <strong>{user?.name || 'Not available'}</strong>
-            </div>
+          {user ? (
+            <>
+              <div className="mobile-profile-info">
+                <div className="mobile-profile-row">
+                  <span>Name</span>
+                  <strong>{user.name}</strong>
+                </div>
 
-            <div className="mobile-profile-row">
-              <span>Email</span>
-              <strong>{user?.email || 'Not available'}</strong>
-            </div>
+                <div className="mobile-profile-row">
+                  <span>Email</span>
+                  <strong>{user.email}</strong>
+                </div>
 
-            <div className="mobile-profile-row">
-              <span>Mobile</span>
-              <strong>
-                {user?.mobileNumber || 'Not available'}
-              </strong>
-            </div>
-          </div>
+                <div className="mobile-profile-row">
+                  <span>Mobile</span>
+                  <strong>{user.mobileNumber}</strong>
+                </div>
+              </div>
 
-          <button
-            type="button"
-            className="mobile-profile-logout"
-            onClick={logout}
-          >
-            Log out
-          </button>
+              <button
+                type="button"
+                className="mobile-profile-logout"
+                onClick={logout}
+              >
+                Log out
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="mobile-profile-logout"
+              onClick={() => requireVerification()}
+            >
+              Sign in or create account
+            </button>
+          )}
         </div>
       )}
 
@@ -995,7 +993,6 @@ function App() {
           notify={notify}
           navigate={guardedNavigate}
           user={user}
-          requireVerification={requireVerification}
         />
       )}
 
@@ -1099,6 +1096,7 @@ function AccountPanel({
   user,
   close,
   onLogout,
+  onSignIn,
 }) {
   return (
     <div
@@ -1113,14 +1111,8 @@ function AccountPanel({
         </div>
 
         <div>
-          <strong>
-            {user?.name ||
-              'Verified user'}
-          </strong>
-
-          <span>
-            Verified account
-          </span>
+          <strong>{user?.name || 'Your account'}</strong>
+          <span>{user ? 'Verified account' : 'Welcome to EquipTrade'}</span>
         </div>
 
         <button
@@ -1133,40 +1125,34 @@ function AccountPanel({
 
       </div>
 
-      <div className="account-details">
+      {user ? (
+        <>
+          <div className="account-details">
+            <div>
+              <span>Name</span>
+              <strong>{user.name}</strong>
+            </div>
 
-        <div>
-          <span>Name</span>
-          <strong>
-            {user?.name ||
-              'Not available'}
-          </strong>
-        </div>
+            <div>
+              <span>Email</span>
+              <strong>{user.email}</strong>
+            </div>
 
-        <div>
-          <span>Email</span>
-          <strong>
-            {user?.email ||
-              'Not available'}
-          </strong>
-        </div>
+            <div>
+              <span>Mobile number</span>
+              <strong>{user.mobileNumber}</strong>
+            </div>
+          </div>
 
-        <div>
-          <span>Mobile number</span>
-          <strong>
-            {user?.mobileNumber ||
-              'Not available'}
-          </strong>
-        </div>
-
-      </div>
-
-      <button
-        className="logout-button"
-        onClick={onLogout}
-      >
-        Log out
-      </button>
+          <button className="logout-button" onClick={onLogout}>
+            Log out
+          </button>
+        </>
+      ) : (
+        <button className="logout-button" onClick={onSignIn}>
+          Sign in or create account
+        </button>
+      )}
     </div>
   )
 }
