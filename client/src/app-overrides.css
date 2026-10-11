@@ -4021,6 +4021,68 @@ body {
   }
 }
 
+.home-page .hero-search {
+  position: relative;
+  z-index: 0;
+  animation: home-search-glow 2.25s ease-in-out infinite;
+  transition: border-color .2s ease, box-shadow .2s ease;
+}
+
+.home-page .hero-search > svg {
+  animation: home-search-icon 2.25s ease-in-out infinite;
+  transform-origin: center;
+}
+
+.home-page .hero-search:focus-within,
+.home-page .hero-search:hover {
+  border-color: rgba(241, 181, 72, .75);
+  animation-play-state: paused;
+  box-shadow: 0 0 0 5px rgba(241, 181, 72, .2), 0 0 34px rgba(241, 181, 72, .35), 0 15px 36px rgba(5, 16, 20, .2);
+}
+
+.home-page .hero-search:focus-within > svg,
+.home-page .hero-search:hover > svg {
+  animation-play-state: paused;
+  color: #c88a21;
+  transform: scale(1.12);
+}
+
+@keyframes home-search-icon {
+  0%,
+  100% {
+    color: #91a2ad;
+    transform: scale(1);
+  }
+
+  50% {
+    color: #d59a34;
+    transform: scale(1.16);
+  }
+}
+
+@keyframes home-search-glow {
+  0%,
+  100% {
+    border-color: rgba(255, 255, 255, .2);
+    box-shadow: 0 0 0 0 rgba(241, 181, 72, 0), 0 15px 36px rgba(5, 16, 20, .2);
+  }
+
+  50% {
+    border-color: rgba(255, 194, 86, .95);
+    box-shadow:
+      0 0 0 8px rgba(241, 181, 72, .2),
+      0 0 42px rgba(241, 181, 72, .45),
+      0 15px 36px rgba(5, 16, 20, .2);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-page .hero-search,
+  .home-page .hero-search > svg {
+    animation: none;
+  }
+}
+
 .info-page {
   min-height: 70vh;
   padding-bottom: 76px;

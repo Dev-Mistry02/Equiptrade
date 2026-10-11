@@ -198,30 +198,16 @@ router.post('/send-otp', async (req, res) => {
     })
   } catch (error) {
     console.error('Failed to send account verification code:', {
-      code: error?.code,
-      responseCode: error?.responseCode,
-      command: error?.command,
+      status: error?.status,
       message: error?.message,
     })
 
-    const code = error?.code
-    const responseCode = error?.responseCode
-
     const isConfigurationError =
-      error?.message?.startsWith('SMTP_') ||
+      error?.message?.startsWith('RESEND_API_KEY') ||
       error?.message?.startsWith('MAIL_FROM')
 
     const isAuthenticationError =
-      code === 'EAUTH' || responseCode === 535
-
-    const isDnsError = code === 'ENOTFOUND'
-
-    const isConnectionError = [
-      'ECONNECTION',
-      'ECONNREFUSED',
-      'ETIMEDOUT',
-      'ESOCKET',
-    ].includes(code)
+      error?.status === 401 || error?.status === 403
 
     let message =
       'Email delivery failed. Check the backend logs and email provider settings.'
@@ -230,13 +216,7 @@ router.post('/send-otp', async (req, res) => {
       message = `Email configuration error: ${error.message}`
     } else if (isAuthenticationError) {
       message =
-        'Email provider rejected authentication. Check SMTP_USER and SMTP_PASSWORD.'
-    } else if (isDnsError) {
-      message =
-        'Could not resolve the SMTP hostname. Check SMTP_HOST and the server network.'
-    } else if (isConnectionError) {
-      message =
-        'Could not connect to the email server. Check SMTP_HOST, SMTP_PORT and SMTP_SECURE.'
+        'Resend rejected the API key. Check RESEND_API_KEY and its permissions.'
     }
 
     return res.status(
