@@ -11,8 +11,10 @@ import Admin from '../models/Admin.js'
 import { env } from '../config/env.js'
 import { sendOtpEmail } from '../services/mailer.js'
 import {
+  completeOtpVerification,
   hashOtpForStore,
   reserveOtp,
+  releaseOtpVerification,
   restoreOtp,
   verifyAndConsumeOtp,
 } from '../services/otpStore.js'
@@ -289,12 +291,14 @@ router.post('/verify-otp', async (req, res) => {
           'Invalid or expired verification code. Request a new code.',
       })
     }
+    const verificationLockToken = crypto.randomBytes(32).toString('hex')
     const verification = await verifyAndConsumeOtp({
       email,
       userId: user._id,
       submittedHash: hashOtpForStore(otp),
       now: Date.now(),
       maxAttempts: OTP_MAX_ATTEMPTS,
+      lockToken: verificationLockToken,
     })
     const verificationStatus = Number(verification[0])
 
@@ -323,23 +327,51 @@ router.post('/verify-otp', async (req, res) => {
       })
     }
 
-    const [, consumedUserId, pendingName, pendingMobileNumber] = verification
-    const verifiedUser = await User.findOneAndUpdate(
-      { _id: consumedUserId, email },
-      {
-        $set: {
-          name: pendingName || user.name,
-          mobileNumber: pendingMobileNumber || user.mobileNumber,
-          verified: true,
-        },
-      },
-      { new: true }
-    )
-
-    if (!verifiedUser) {
-      return res.status(400).json({
-        message: 'The account changed during verification. Request a new code.',
+    if (verificationStatus === 4) {
+      const retryAfterSeconds = Number(verification[1])
+      res.set('Retry-After', String(retryAfterSeconds))
+      return res.status(409).json({
+        message: 'Verification is already processing. Please try again shortly.',
+        retryAfterSeconds,
       })
+    }
+
+    const [, consumedUserId, pendingName, pendingMobileNumber] = verification
+    let verifiedUser
+    try {
+      verifiedUser = await User.findOneAndUpdate(
+        { _id: consumedUserId, email },
+        {
+          $set: {
+            name: pendingName || user.name,
+            mobileNumber: pendingMobileNumber || user.mobileNumber,
+            verified: true,
+          },
+        },
+        { new: true }
+      )
+
+      if (!verifiedUser) {
+        await releaseOtpVerification(email, verificationLockToken)
+        return res.status(400).json({
+          message: 'The account changed during verification. Request a new code.',
+        })
+      }
+
+      const consumed = await completeOtpVerification(
+        email,
+        verificationLockToken
+      )
+      if (Number(consumed) !== 1) {
+        throw new Error('Could not consume the verified OTP.')
+      }
+    } catch (error) {
+      try {
+        await releaseOtpVerification(email, verificationLockToken)
+      } catch (releaseError) {
+        console.error('Failed to release OTP verification lock:', releaseError.message)
+      }
+      throw error
     }
 
     const token = jwt.sign(

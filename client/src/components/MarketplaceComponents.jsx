@@ -105,6 +105,17 @@ export function EquipmentCard({ item, onClick, onSave, imageSizes }) {
             <Building2 size={14} /> {(item.location || 'Location not provided').split(',')[0]}
           </span>
         </div>
+
+        <button
+          type="button"
+          className="equipment-see-details-button"
+          onClick={event => {
+            event.stopPropagation()
+            onClick?.(item)
+          }}
+        >
+          See Details
+        </button>
       </div>
     </article>
   )

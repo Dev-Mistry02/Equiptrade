@@ -3,6 +3,7 @@ import { createClient } from 'redis'
 import { env } from '../config/env.js'
 
 const OTP_KEY_PREFIX = 'equiptrade:otp:v1:'
+const VERIFICATION_LOCK_MS = 30 * 1000
 
 const ISSUE_OTP_SCRIPT = `
 local fields = {
@@ -14,13 +15,19 @@ local fields = {
   'attempts',
   'pendingName',
   'pendingMobileNumber',
-  'userId'
+  'userId',
+  'verificationLockToken',
+  'verificationLockExpiresAt'
 }
 local old = redis.call('HMGET', KEYS[1], unpack(fields))
 local now = tonumber(ARGV[3])
 local lastSentAt = tonumber(old[5] or '')
 local cooldownMs = tonumber(ARGV[5])
+local lockExpiresAt = tonumber(old[11] or '0')
 
+if old[10] and lockExpiresAt > now then
+  return {0, tostring(math.max(1, math.ceil((lockExpiresAt - now) / 1000)))}
+end
 if lastSentAt and now - lastSentAt < cooldownMs then
   return {0, tostring(math.max(1, math.ceil((lastSentAt + cooldownMs - now) / 1000)))}
 end
@@ -89,7 +96,9 @@ local fields = {
   'attempts',
   'pendingName',
   'pendingMobileNumber',
-  'userId'
+  'userId',
+  'verificationLockToken',
+  'verificationLockExpiresAt'
 }
 local now = tonumber(ARGV[3])
 local expiresAt = 0
@@ -119,6 +128,15 @@ if redis.call('HGET', KEYS[1], 'userId') ~= ARGV[1] then
 end
 
 local now = tonumber(ARGV[3])
+local lockToken = redis.call('HGET', KEYS[1], 'verificationLockToken')
+local lockExpiresAt = tonumber(redis.call('HGET', KEYS[1], 'verificationLockExpiresAt') or '0')
+if lockToken and lockExpiresAt > now then
+  return {4, tostring(math.max(1, math.ceil((lockExpiresAt - now) / 1000)))}
+end
+if lockToken then
+  redis.call('HDEL', KEYS[1], 'verificationLockToken', 'verificationLockExpiresAt')
+end
+
 local currentHash = redis.call('HGET', KEYS[1], 'currentOtpHash')
 local currentExpiresAt = tonumber(redis.call('HGET', KEYS[1], 'currentOtpExpiresAt') or '0')
 local previousHash = redis.call('HGET', KEYS[1], 'previousOtpHash')
@@ -134,8 +152,13 @@ if (currentActive and currentHash == ARGV[2]) or (previousActive and previousHas
   local userId = redis.call('HGET', KEYS[1], 'userId')
   local name = redis.call('HGET', KEYS[1], 'pendingName') or ''
   local mobileNumber = redis.call('HGET', KEYS[1], 'pendingMobileNumber') or ''
-  redis.call('DEL', KEYS[1])
-  return {1, userId, name, mobileNumber}
+  redis.call(
+    'HSET',
+    KEYS[1],
+    'verificationLockToken', ARGV[5],
+    'verificationLockExpiresAt', tostring(now + tonumber(ARGV[6]))
+  )
+  return {1, userId, name, mobileNumber, ARGV[5]}
 end
 
 local attempts = redis.call('HINCRBY', KEYS[1], 'attempts', 1)
@@ -145,6 +168,24 @@ if attempts >= tonumber(ARGV[4]) then
 end
 
 return {2, tostring(attempts)}
+`
+
+const COMPLETE_VERIFICATION_SCRIPT = `
+if redis.call('HGET', KEYS[1], 'verificationLockToken') ~= ARGV[1] then
+  return 0
+end
+
+redis.call('DEL', KEYS[1])
+return 1
+`
+
+const RELEASE_VERIFICATION_SCRIPT = `
+if redis.call('HGET', KEYS[1], 'verificationLockToken') ~= ARGV[1] then
+  return 0
+end
+
+redis.call('HDEL', KEYS[1], 'verificationLockToken', 'verificationLockExpiresAt')
+return 1
 `
 
 const unavailableError = message => {
@@ -264,11 +305,22 @@ export async function verifyAndConsumeOtp({
   submittedHash,
   now,
   maxAttempts,
+  lockToken,
 }) {
   return executeScript(VERIFY_OTP_SCRIPT, email, [
     String(userId),
     submittedHash,
     String(now),
     String(maxAttempts),
+    lockToken,
+    String(VERIFICATION_LOCK_MS),
   ])
+}
+
+export async function completeOtpVerification(email, lockToken) {
+  return executeScript(COMPLETE_VERIFICATION_SCRIPT, email, [lockToken])
+}
+
+export async function releaseOtpVerification(email, lockToken) {
+  return executeScript(RELEASE_VERIFICATION_SCRIPT, email, [lockToken])
 }

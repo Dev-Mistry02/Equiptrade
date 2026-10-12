@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import React, { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import {
   ArrowRight,
@@ -14,11 +14,13 @@ import {
   LockKeyhole,
   LoaderCircle,
   Menu,
+  Moon,
   Search,
   Scale,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
+  Sun,
   Truck,
   Upload,
   UserRound,
@@ -130,7 +132,32 @@ function CookieNotice({ onAccept }) {
   )
 }
 
+function ThemeToggle({ theme, onToggle }) {
+  const nextTheme = theme === 'dark' ? 'light' : 'dark'
+
+  return (
+    <button
+      type="button"
+      className="theme-toggle"
+      aria-label={`Switch to ${nextTheme} theme`}
+      title={`Switch to ${nextTheme} theme`}
+      aria-pressed={theme === 'dark'}
+      onClick={onToggle}
+    >
+      {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+    </button>
+  )
+}
+
 function App() {
+  const [theme, setTheme] = useState(() => {
+    try {
+      return localStorage.getItem('equiptrade_theme') === 'dark' ? 'dark' : 'light'
+    } catch {
+      return 'light'
+    }
+  })
+
   const savedAuthDraft = (() => {
     try {
       const draft = JSON.parse(
@@ -217,6 +244,15 @@ function App() {
     hasAcceptedCookieConsent
   )
   const authRequestInFlight = useRef(false)
+
+  useLayoutEffect(() => {
+    document.documentElement.dataset.theme = theme
+    try {
+      localStorage.setItem('equiptrade_theme', theme)
+    } catch (error) {
+      console.warn('Unable to save theme preference on this device:', error)
+    }
+  }, [theme])
 
   useEffect(() => {
     const legacyAuthKeys = [
@@ -825,6 +861,8 @@ function App() {
     return (
       <>
         <AdminLogin
+          theme={theme}
+          onToggleTheme={() => setTheme(current => current === 'dark' ? 'light' : 'dark')}
           onLogin={() => {
             setAdminAuthenticated(true)
             window.dispatchEvent(new Event('equiptrade:session-changed'))
@@ -844,6 +882,8 @@ function App() {
           <AdminHeader
             navigate={navigate}
             onLogout={adminLogout}
+            theme={theme}
+            onToggleTheme={() => setTheme(current => current === 'dark' ? 'light' : 'dark')}
           />
 
           <Suspense fallback={<PageLoading />}>
@@ -965,6 +1005,11 @@ function App() {
         </nav>
 
         <div className="top-actions">
+
+          <ThemeToggle
+            theme={theme}
+            onToggle={() => setTheme(current => current === 'dark' ? 'light' : 'dark')}
+          />
 
           {/* <button
             className="icon-btn"
@@ -1317,6 +1362,8 @@ function AccountPanel({
 function AdminHeader({
   navigate,
   onLogout,
+  theme,
+  onToggleTheme,
 }) {
   return (
     <header className="admin-topbar">
@@ -1332,6 +1379,8 @@ function AdminHeader({
       </button>
 
       <div className="admin-topbar-actions">
+
+        <ThemeToggle theme={theme} onToggle={onToggleTheme} />
 
         <span className="admin-context">
           <ShieldCheck size={15} />
@@ -1365,7 +1414,7 @@ function AdminHeader({
   )
 }
 
-function AdminLogin({ onLogin }) {
+function AdminLogin({ onLogin, theme, onToggleTheme }) {
   const [credentials, setCredentials] =
     useState({
       name: '',
@@ -1403,6 +1452,7 @@ function AdminLogin({ onLogin }) {
 
   return (
     <main className="admin-login-page">
+      <ThemeToggle theme={theme} onToggle={onToggleTheme} />
       <section className="admin-login-card">
 
         <div className="admin-login-icon">
@@ -2594,6 +2644,14 @@ function EquipmentCard({
           </span>
 
         </div>
+
+        <button
+          type="button"
+          className="equipment-see-details-button"
+          onClick={onClick}
+        >
+          See Details
+        </button>
 
       </div>
     </article>
