@@ -17,7 +17,8 @@ local fields = {
   'pendingMobileNumber',
   'userId',
   'verificationLockToken',
-  'verificationLockExpiresAt'
+  'verificationLockExpiresAt',
+  'activeOtpHashes'
 }
 local old = redis.call('HMGET', KEYS[1], unpack(fields))
 local now = tonumber(ARGV[3])
@@ -32,6 +33,34 @@ if lastSentAt and now - lastSentAt < cooldownMs then
   return {0, tostring(math.max(1, math.ceil((lastSentAt + cooldownMs - now) / 1000)))}
 end
 
+local activeOtps = {}
+local seenHashes = {}
+local function addActiveOtp(hash, expiresAt)
+  local expiry = tonumber(expiresAt or '0')
+  if hash and expiry > now then
+    if seenHashes[hash] then
+      for _, otp in ipairs(activeOtps) do
+        if otp.hash == hash and expiry > otp.expiresAt then
+          otp.expiresAt = expiry
+          break
+        end
+      end
+    else
+      table.insert(activeOtps, {hash = hash, expiresAt = expiry})
+      seenHashes[hash] = true
+    end
+  end
+end
+
+if old[12] then
+  local storedOtps = cjson.decode(old[12])
+  for _, otp in ipairs(storedOtps) do
+    addActiveOtp(otp.hash, otp.expiresAt)
+  end
+end
+addActiveOtp(old[1], old[2])
+addActiveOtp(old[3], old[4])
+
 local previousHash = false
 local previousExpiresAt = false
 if old[1] and tonumber(old[2] or '0') > now then
@@ -43,10 +72,11 @@ elseif old[3] and tonumber(old[4] or '0') > now then
 end
 
 local attempts = '0'
-if previousHash then
+if #activeOtps > 0 then
   attempts = old[6] or '0'
 end
 
+addActiveOtp(ARGV[2], ARGV[4])
 redis.call(
   'HSET',
   KEYS[1],
@@ -56,7 +86,8 @@ redis.call(
   'lastSentAt', ARGV[3],
   'attempts', attempts,
   'pendingName', ARGV[6],
-  'pendingMobileNumber', ARGV[7]
+  'pendingMobileNumber', ARGV[7],
+  'activeOtpHashes', cjson.encode(activeOtps)
 )
 
 if previousHash then
@@ -71,8 +102,10 @@ else
 end
 
 local expiresAt = tonumber(ARGV[4])
-if previousExpiresAt and tonumber(previousExpiresAt) > expiresAt then
-  expiresAt = tonumber(previousExpiresAt)
+for _, otp in ipairs(activeOtps) do
+  if otp.expiresAt > expiresAt then
+    expiresAt = otp.expiresAt
+  end
 end
 redis.call('PEXPIREAT', KEYS[1], expiresAt)
 
@@ -98,7 +131,8 @@ local fields = {
   'pendingMobileNumber',
   'userId',
   'verificationLockToken',
-  'verificationLockExpiresAt'
+  'verificationLockExpiresAt',
+  'activeOtpHashes'
 }
 local now = tonumber(ARGV[3])
 local expiresAt = 0
@@ -109,6 +143,16 @@ for i, field in ipairs(fields) do
     redis.call('HSET', KEYS[1], field, value)
     if (field == 'currentOtpExpiresAt' or field == 'previousOtpExpiresAt') and tonumber(value) > expiresAt then
       expiresAt = tonumber(value)
+    end
+  end
+end
+
+if type(old[12]) == 'string' then
+  local activeOtps = cjson.decode(old[12])
+  for _, otp in ipairs(activeOtps) do
+    local otpExpiresAt = tonumber(otp.expiresAt or '0')
+    if otpExpiresAt > expiresAt then
+      expiresAt = otpExpiresAt
     end
   end
 end
@@ -143,12 +187,28 @@ local previousHash = redis.call('HGET', KEYS[1], 'previousOtpHash')
 local previousExpiresAt = tonumber(redis.call('HGET', KEYS[1], 'previousOtpExpiresAt') or '0')
 local currentActive = currentHash and currentExpiresAt > now
 local previousActive = previousHash and previousExpiresAt > now
+local activeOtpsJson = redis.call('HGET', KEYS[1], 'activeOtpHashes')
+local hasActiveOtp = currentActive or previousActive
+local submittedOtpIsActive = (currentActive and currentHash == ARGV[2]) or
+  (previousActive and previousHash == ARGV[2])
 
-if not currentActive and not previousActive then
+if activeOtpsJson then
+  local activeOtps = cjson.decode(activeOtpsJson)
+  for _, otp in ipairs(activeOtps) do
+    if tonumber(otp.expiresAt or '0') > now then
+      hasActiveOtp = true
+      if otp.hash == ARGV[2] then
+        submittedOtpIsActive = true
+      end
+    end
+  end
+end
+
+if not hasActiveOtp then
   return {0}
 end
 
-if (currentActive and currentHash == ARGV[2]) or (previousActive and previousHash == ARGV[2]) then
+if submittedOtpIsActive then
   local userId = redis.call('HGET', KEYS[1], 'userId')
   local name = redis.call('HGET', KEYS[1], 'pendingName') or ''
   local mobileNumber = redis.call('HGET', KEYS[1], 'pendingMobileNumber') or ''

@@ -188,12 +188,12 @@ export async function sendOtpEmail(email, name, otp) {
 
 Your EquipTrade India verification code is ${otp}.
 
-It expires in 10 minutes. If you did not request this code, you can ignore this email.`,
+It expires in 10 minutes. If you requested more than one code, any code sent in the last 10 minutes can be used until it expires. If you did not request this code, you can ignore this email.`,
     html: emailLayout({
       eyebrow: 'ACCOUNT SECURITY',
       title: 'Verify your email address',
       intro: `Hello ${name || 'there'}, use the verification code below to complete your email verification.`,
-      body: `<div style="margin:24px 0;padding:24px 16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;text-align:center"><div style="font-size:11px;letter-spacing:1.5px;font-weight:700;color:#64748b;margin-bottom:12px">YOUR VERIFICATION CODE</div><div style="font-size:32px;font-weight:800;letter-spacing:9px;color:#111827">${safeOtp}</div></div><p style="margin:0 0 12px;color:#475569;font-size:14px;line-height:1.7"><strong>This code expires in 10 minutes.</strong> For your security, never share this code with anyone.</p><p style="margin:0;color:#64748b;font-size:13px;line-height:1.7">If you did not request this code, you can safely ignore this email.</p>`,
+      body: `<div style="margin:24px 0;padding:24px 16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;text-align:center"><div style="font-size:11px;letter-spacing:1.5px;font-weight:700;color:#64748b;margin-bottom:12px">YOUR VERIFICATION CODE</div><div style="font-size:32px;font-weight:800;letter-spacing:9px;color:#111827">${safeOtp}</div></div><p style="margin:0 0 12px;color:#475569;font-size:14px;line-height:1.7"><strong>This code expires in 10 minutes.</strong> If you requested more than one code, any code sent in the last 10 minutes can be used until it expires. For your security, never share a code with anyone.</p><p style="margin:0;color:#64748b;font-size:13px;line-height:1.7">If you did not request this code, you can safely ignore this email.</p>`,
       footerNote: 'Keeping your EquipTrade India account secure.',
     }),
   })

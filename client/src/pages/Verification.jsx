@@ -133,8 +133,14 @@ export default function Verification({
               <form onSubmit={onVerify}>
                 <input
                   className="otp-input"
+                  type="text"
+                  name="otp"
                   inputMode="numeric"
                   autoComplete="one-time-code"
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  enterKeyHint="done"
                   maxLength={6}
                   minLength={6}
                   pattern="[0-9]{6}"
@@ -142,6 +148,7 @@ export default function Verification({
                   value={otp}
                   onChange={event => setOtp(event.target.value.replace(/\D/g, '').slice(0, 6))}
                   placeholder="000000"
+                  aria-label="6-digit verification code"
                 />
 
                 {error && <p className="verification-error" role="alert">{error}</p>}
@@ -153,6 +160,7 @@ export default function Verification({
               </form>
 
               <p className="verification-note">
+                Earlier codes remain valid for up to 10 minutes after they’re sent.{' '}
                 After verification, you’ll stay signed in for 30 days on this device.
               </p>
 
