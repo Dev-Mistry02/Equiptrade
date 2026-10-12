@@ -8,6 +8,7 @@ export const env = {
     'mongodb://127.0.0.1:27017/equiptrade',
   resendApiKey: process.env.RESEND_API_KEY?.trim(),
   mailFrom: process.env.MAIL_FROM?.trim(),
+  redisUrl: process.env.REDIS_URL?.trim(),
   adminSessionSecret: process.env.ADMIN_SESSION_SECRET?.trim(),
   jwtSecret: process.env.JWT_SECRET?.trim(),
 };
