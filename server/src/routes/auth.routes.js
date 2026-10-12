@@ -281,13 +281,21 @@ router.post('/send-otp', async (req, res) => {
 
     const isAuthenticationError =
       error?.status === 401 || error?.status === 403
+    const resendRecipientRestriction =
+      error?.status === 403 &&
+      /testing emails to your own email|verify a domain|verified domain/i.test(
+        error.message || ''
+      )
     const isEmailConfigurationError =
       isConfigurationError || isAuthenticationError
 
     let message =
       'Email delivery failed. Check the backend logs and email provider settings.'
 
-    if (isEmailConfigurationError) {
+    if (resendRecipientRestriction) {
+      message =
+        'Email provider is restricted to its account email. Verify a sending domain in Resend and set MAIL_FROM to an address on that domain.'
+    } else if (isEmailConfigurationError) {
       message =
         'We could not send a verification code right now. Please try again later or contact support.'
     }

@@ -26,19 +26,17 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api'
 import { EquipmentCard } from '../components/MarketplaceComponents'
+import {
+  getCachedListings,
+  getCachedProduct,
+  setCachedListings,
+  setCachedProduct,
+} from '../marketplaceCache'
+import { toProductSlug } from '../productSlug'
 import { isListingSaved, toggleSavedListing } from '../savedListings'
 import '../product-detail.css'
 
-export function toProductSlug(name) {
-  if (!name) return ''
-  return encodeURIComponent(
-    String(name)
-      .toLowerCase()
-      .trim()
-      .replace(/[^\w\s-]/g, '')
-      .replace(/[\s_-]+/g, '-')
-  )
-}
+export { toProductSlug }
 
 function matchesProductSlug(item, targetSlug) {
   if (!item || !targetSlug) return false
@@ -69,13 +67,15 @@ export default function ProductDetail({
     if (initialProduct && matchesProductSlug(initialProduct, slug)) {
       return initialProduct
     }
-    return null
+    return getCachedProduct(slug) || null
   })
 
   const [loading, setLoading] = useState(!item)
   const [error, setError] = useState('')
   const [activeImage, setActiveImage] = useState(0)
-  const [allListings, setAllListings] = useState([])
+  const [allListings, setAllListings] = useState(
+    () => getCachedListings() || []
+  )
   const [enquiryModal, setEnquiryModal] = useState(false)
   const [enquirySending, setEnquirySending] = useState(false)
   const [enquiryError, setEnquiryError] = useState('')
@@ -142,10 +142,11 @@ export default function ProductDetail({
     const requestId = ++productRequestVersion.current
 
     try {
-      setLoading(true)
+      const cachedProduct = getCachedProduct(slug)
+      if (!cachedProduct) setLoading(true)
       setError('')
 
-      let found = null
+      let found = cachedProduct || null
       let listingsLoaded = false
 
       // First try specific endpoint
@@ -168,6 +169,7 @@ export default function ProductDetail({
         }
 
         setAllListings(data)
+        setCachedListings('all', data)
         listingsLoaded = true
         found = data.find(listing =>
           matchesProductSlug(listing, slug)
@@ -179,6 +181,7 @@ export default function ProductDetail({
         return
       }
 
+      setCachedProduct(slug, found)
       setItem(found)
       setActiveImage(0)
 
@@ -190,6 +193,7 @@ export default function ProductDetail({
           if (!Array.isArray(data)) {
             throw new Error('The marketplace returned an unexpected response.')
           }
+          setCachedListings('all', data)
           setAllListings(data)
         })
         .catch(error => {
@@ -223,6 +227,7 @@ export default function ProductDetail({
           if (!Array.isArray(data)) {
             throw new Error('The marketplace returned an unexpected response.')
           }
+          setCachedListings('all', data)
           setAllListings(data)
         })
         .catch(error => {

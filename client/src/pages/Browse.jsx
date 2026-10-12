@@ -10,7 +10,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import { EquipmentCard } from '../components/MarketplaceComponents'
 import { categories } from '../data'
-import { toProductSlug } from './ProductDetail'
+import { getCachedListings, setCachedListings } from '../marketplaceCache'
+import { toProductSlug } from '../productSlug'
+
+function getBrowseCacheKey(search, filters) {
+  return `browse:${JSON.stringify({ search, filters })}`
+}
 
 export default function Browse({
   search,
@@ -19,10 +24,6 @@ export default function Browse({
   onSaveListing,
   navigate,
 }) {
-  const [equipment, setEquipment] = useState([])
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(true)
-
   const [filters, setFilters] = useState({
     category: '',
     condition: '',
@@ -31,6 +32,14 @@ export default function Browse({
     maxPrice: '',
   })
 
+  const browseCacheKey = getBrowseCacheKey(search, filters)
+  const [equipment, setEquipment] = useState(
+    () => getCachedListings(browseCacheKey) || []
+  )
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(
+    () => !getCachedListings(browseCacheKey)
+  )
   const [showFilters, setShowFilters] = useState(false)
   const requestVersion = useRef(0)
   const activeRequest = useRef(null)
@@ -58,6 +67,8 @@ export default function Browse({
    */
   const fetchEquipment = useCallback(async ({ showLoading = true } = {}) => {
     const requestId = ++requestVersion.current
+    const cacheKey = getBrowseCacheKey(search, filters)
+    const hasCachedListings = Boolean(getCachedListings(cacheKey))
     activeRequest.current?.abort()
 
     const controller = new AbortController()
@@ -65,7 +76,7 @@ export default function Browse({
 
     try {
       setError('')
-      if (showLoading) setLoading(true)
+      if (showLoading && !hasCachedListings) setLoading(true)
 
       const data = await api.getEquipment({
         search,
@@ -77,6 +88,7 @@ export default function Browse({
       if (requestId !== requestVersion.current) return
 
       if (Array.isArray(data)) {
+        setCachedListings(cacheKey, data)
         setEquipment(data)
       } else {
         throw new Error('The marketplace returned an unexpected response.')
@@ -84,7 +96,9 @@ export default function Browse({
     } catch (error) {
       if (requestId !== requestVersion.current) return
       console.error('Failed to load marketplace:', error)
-      setError(error.message || 'Unable to load marketplace.')
+      if (!hasCachedListings) {
+        setError(error.message || 'Unable to load marketplace.')
+      }
     } finally {
       if (requestId === requestVersion.current) {
         activeRequest.current = null

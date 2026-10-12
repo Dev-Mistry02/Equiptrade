@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import {
   ArrowRight,
@@ -28,19 +28,30 @@ import {
 import { API_URL, api } from './api'
 import { toggleSavedListing } from './savedListings'
 import { categories, equipment } from './data'
-import HomePage from './pages/Home'
-import BrowsePage from './pages/Browse'
-import SellPage from './pages/Sell'
-import AdminPage from './pages/Admin'
-import VerificationPage from './pages/Verification'
-import AboutPage from './pages/About'
-import LegalInfoPage from './pages/legalInfo'
-import ContactPage from './pages/Contact'
-import ProductDetailPage, { toProductSlug } from './pages/ProductDetail'
+import { toProductSlug } from './productSlug'
 import Footer from './components/Footer'
 import BrandLogo from './components/BrandLogo'
 import './desktop.css'
 import './app-overrides.css'
+
+const HomePage = lazy(() => import('./pages/Home'))
+const BrowsePage = lazy(() => import('./pages/Browse'))
+const SellPage = lazy(() => import('./pages/Sell'))
+const AdminPage = lazy(() => import('./pages/Admin'))
+const VerificationPage = lazy(() => import('./pages/Verification'))
+const AboutPage = lazy(() => import('./pages/About'))
+const LegalInfoPage = lazy(() => import('./pages/legalInfo'))
+const ContactPage = lazy(() => import('./pages/Contact'))
+const ProductDetailPage = lazy(() => import('./pages/ProductDetail'))
+
+function PageLoading() {
+  return (
+    <main className="session-loader" role="status" aria-live="polite">
+      <LoaderCircle className="action-spinner" size={34} />
+      <span>Loading EquipTrade...</span>
+    </main>
+  )
+}
 
 const pathToPage = {
   '/home': 'home',
@@ -835,7 +846,9 @@ function App() {
             onLogout={adminLogout}
           />
 
-          <AdminPage notify={notify} />
+          <Suspense fallback={<PageLoading />}>
+            <AdminPage notify={notify} />
+          </Suspense>
 
           {toast && (
             <div className="toast">
@@ -1081,67 +1094,67 @@ function App() {
         </div>
       )}
 
-      {page === 'home' && (
-        <HomePage
-          navigate={guardedNavigate}
-          onSaveListing={handleSaveListing}
-          setSelected={item => {
-            const slug = toProductSlug(item?.name) || item?._id
-            guardedNavigate('product-detail', { product: item, slug })
-          }}
-          search={search}
-          setSearch={setSearch}
-        />
-      )}
+      <Suspense fallback={<PageLoading />}>
+        {page === 'home' && (
+          <HomePage
+            navigate={guardedNavigate}
+            onSaveListing={handleSaveListing}
+            setSelected={item => {
+              const slug = toProductSlug(item?.name) || item?._id
+              guardedNavigate('product-detail', { product: item, slug })
+            }}
+            search={search}
+            setSearch={setSearch}
+          />
+        )}
 
-      {page === 'about' && <AboutPage navigate={guardedNavigate} />}
+        {page === 'about' && <AboutPage navigate={guardedNavigate} />}
 
-      {page === 'legal-info' && <LegalInfoPage navigate={navigate} />}
+        {page === 'legal-info' && <LegalInfoPage navigate={navigate} />}
 
-      {page === 'contact' && <ContactPage navigate={navigate} />}
+        {page === 'contact' && <ContactPage navigate={navigate} />}
 
-      {page === 'browse' && (
-        <BrowsePage
-          search={search}
-          setSearch={setSearch}
-          onSaveListing={handleSaveListing}
-          setSelected={item => {
-            const slug = toProductSlug(item?.name) || item?._id
-            guardedNavigate('product-detail', { product: item, slug })
-          }}
-          navigate={guardedNavigate}
-        />
-      )}
+        {page === 'browse' && (
+          <BrowsePage
+            search={search}
+            setSearch={setSearch}
+            onSaveListing={handleSaveListing}
+            setSelected={item => {
+              const slug = toProductSlug(item?.name) || item?._id
+              guardedNavigate('product-detail', { product: item, slug })
+            }}
+            navigate={guardedNavigate}
+          />
+        )}
 
-      {page === 'product-detail' && (
-        <ProductDetailPage
-          slug={productSlug}
-          product={selectedProduct}
-          navigate={guardedNavigate}
-          notify={notify}
-          requireVerification={requireVerification}
-          user={user}
-        />
-      )}
+        {page === 'product-detail' && (
+          <ProductDetailPage
+            slug={productSlug}
+            product={selectedProduct}
+            navigate={guardedNavigate}
+            notify={notify}
+            requireVerification={requireVerification}
+            user={user}
+          />
+        )}
 
-      {page === 'sell' && (
-        <SellPage
-          notify={notify}
-          navigate={guardedNavigate}
-          user={user}
-          requireVerification={requireVerification}
-        />
-      )}
+        {page === 'sell' && (
+          <SellPage
+            notify={notify}
+            navigate={guardedNavigate}
+            user={user}
+            requireVerification={requireVerification}
+          />
+        )}
 
-      {selected && (
-        <Details
-          item={selected}
-          close={() =>
-            setSelected(null)
-          }
-          notify={notify}
-        />
-      )}
+        {selected && (
+          <Details
+            item={selected}
+            close={() => setSelected(null)}
+            notify={notify}
+          />
+        )}
+      </Suspense>
 
       <Footer
         navigate={guardedNavigate}
@@ -1160,37 +1173,39 @@ function App() {
       )}
 
       {verificationOpen && sessionInitialized && !verified && (
-        <div className="verification-overlay">
-          <button
-            type="button"
-            className="verification-overlay-close"
-            onClick={closeVerification}
-          >
-            <ArrowRight size={16} />
-            Back to marketplace
-          </button>
-          <VerificationPage
-            step={authStep}
-            data={authData}
-            setData={setAuthData}
-            otp={otp}
-            setOtp={value => {
-              setOtp(value)
-              setAuthError('')
-            }}
-            onSend={sendOtp}
-            onVerify={verifyOtp}
-            onChangeEmail={() => {
-              setAuthStep('details')
-              setOtp('')
-              setAuthError('')
-              setResendAvailableAt(0)
-            }}
-            loading={loading}
-            error={authError}
-            resendSeconds={resendSeconds}
-          />
-        </div>
+        <Suspense fallback={<PageLoading />}>
+          <div className="verification-overlay">
+            <button
+              type="button"
+              className="verification-overlay-close"
+              onClick={closeVerification}
+            >
+              <ArrowRight size={16} />
+              Back to marketplace
+            </button>
+            <VerificationPage
+              step={authStep}
+              data={authData}
+              setData={setAuthData}
+              otp={otp}
+              setOtp={value => {
+                setOtp(value)
+                setAuthError('')
+              }}
+              onSend={sendOtp}
+              onVerify={verifyOtp}
+              onChangeEmail={() => {
+                setAuthStep('details')
+                setOtp('')
+                setAuthError('')
+                setResendAvailableAt(0)
+              }}
+              loading={loading}
+              error={authError}
+              resendSeconds={resendSeconds}
+            />
+          </div>
+        </Suspense>
       )}
     </div>
   )

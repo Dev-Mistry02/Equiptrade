@@ -2,19 +2,28 @@ import { ArrowRight, BadgeCheck, Building2, Check, ClipboardCheck, Handshake, Se
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api'
 import { EquipmentCard, Process, SectionHeading } from '../components/MarketplaceComponents'
+import { getCachedListings, setCachedListings } from '../marketplaceCache'
 
 export default function Home({ navigate, setSelected, onSaveListing, search, setSearch }) {
-  const [equipment, setEquipment] = useState([])
-  const [loading, setLoading] = useState(true)
+  const cachedEquipment = getCachedListings()
+  const [equipment, setEquipment] = useState(() => cachedEquipment || [])
+  const [loading, setLoading] = useState(() => !cachedEquipment)
   const [error, setError] = useState('')
   const loadEquipment = useCallback(async () => {
-    setLoading(true)
+    const hasCachedEquipment = Boolean(getCachedListings())
+    if (!hasCachedEquipment) setLoading(true)
     setError('')
 
     try {
-      setEquipment(await api.getEquipment())
+      const listings = await api.getEquipment()
+      setCachedListings('all', listings)
+      setEquipment(listings)
     } catch (requestError) {
-      setError(requestError.message || 'Unable to load equipment.')
+      if (hasCachedEquipment) {
+        console.warn('Unable to refresh cached marketplace listings:', requestError)
+      } else {
+        setError(requestError.message || 'Unable to load equipment.')
+      }
     } finally {
       setLoading(false)
     }
