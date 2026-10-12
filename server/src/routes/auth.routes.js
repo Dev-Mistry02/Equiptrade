@@ -27,6 +27,10 @@ const OTP_MAX_ATTEMPTS = 5
 const hashOtp = otp =>
   crypto.createHash('sha256').update(otp).digest('hex')
 
+const logOtpEvent = (event, details = {}) => {
+  console.info('[auth-otp]', JSON.stringify({ event, ...details }))
+}
+
 const normalizeEmail = email =>
   String(email || '').trim().toLowerCase()
 
@@ -119,6 +123,9 @@ router.post('/admin-logout', (_req, res) => {
 
 // Send email OTP
 router.post('/send-otp', async (req, res) => {
+  const requestId = crypto.randomUUID()
+  let stage = 'validate'
+
   try {
     const name = String(req.body.name || '').trim()
     const mobileNumber = String(
@@ -132,8 +139,9 @@ router.post('/send-otp', async (req, res) => {
       })
     }
 
+    stage = 'load-user'
     let user = await User.findOne({ email }).select(
-      '+otpLastSentAt +otpHash +otpExpiresAt +previousOtpHash +previousOtpExpiresAt +otpAttempts'
+      '+otpLastSentAt +otpHash +otpExpiresAt +previousOtpHash +previousOtpExpiresAt +otpAttempts +pendingName +pendingMobileNumber'
     )
     if (!user) {
       user = new User({ name, mobileNumber, email })
@@ -142,10 +150,16 @@ router.post('/send-otp', async (req, res) => {
       } catch (error) {
         if (error.code !== 11000) throw error
         user = await User.findOne({ email }).select(
-          '+otpLastSentAt +otpHash +otpExpiresAt +previousOtpHash +previousOtpExpiresAt +otpAttempts'
+          '+otpLastSentAt +otpHash +otpExpiresAt +previousOtpHash +previousOtpExpiresAt +otpAttempts +pendingName +pendingMobileNumber'
         )
         if (!user) throw error
       }
+    }
+
+    if (user.verified) {
+      return res.status(409).json({
+        message: 'This email address is already verified. Please sign in.',
+      })
     }
 
     const otp = String(
@@ -155,6 +169,16 @@ router.post('/send-otp', async (req, res) => {
     const otpHash = hashOtp(otp)
     const sentAt = new Date()
     const expiresAt = new Date(sentAt.getTime() + OTP_DURATION_MS)
+    const previousOtpState = {
+      otpHash: user.otpHash,
+      otpExpiresAt: user.otpExpiresAt,
+      previousOtpHash: user.previousOtpHash,
+      previousOtpExpiresAt: user.previousOtpExpiresAt,
+      otpLastSentAt: user.otpLastSentAt,
+      otpAttempts: user.otpAttempts,
+      pendingName: user.pendingName,
+      pendingMobileNumber: user.pendingMobileNumber,
+    }
     const previousOtp = user.otpHash &&
       user.otpExpiresAt?.getTime() > sentAt.getTime()
       ? { hash: user.otpHash, expiresAt: user.otpExpiresAt }
@@ -192,9 +216,11 @@ router.post('/send-otp', async (req, res) => {
       }
     }
 
+    stage = 'reserve-otp'
     const reservedUser = await User.findOneAndUpdate(
       {
         _id: user._id,
+        verified: { $ne: true },
         $or: [
           { otpLastSentAt: { $exists: false } },
           { otpLastSentAt: null },
@@ -208,6 +234,12 @@ router.post('/send-otp', async (req, res) => {
     if (!reservedUser) {
       const latestUser = await User.findById(user._id)
         .select('+otpLastSentAt')
+      if (latestUser?.verified) {
+        return res.status(409).json({
+          message: 'This email address is already verified. Please sign in.',
+        })
+      }
+
       const retryAfterSeconds = latestUser?.otpLastSentAt
         ? Math.max(
           1,
@@ -226,42 +258,52 @@ router.post('/send-otp', async (req, res) => {
       })
     }
 
+    stage = 'send-email'
     try {
       await sendOtpEmail(email, name, otp)
     } catch (mailError) {
       try {
-        const recoveryUpdate = previousOtp
-          ? {
-            $set: {
-              otpHash: previousOtp.hash,
-              otpExpiresAt: previousOtp.expiresAt,
-              otpAttempts: user.otpAttempts || 0,
-            },
-            $unset: {
-              previousOtpHash: '',
-              previousOtpExpiresAt: '',
-              otpLastSentAt: '',
-            },
-          }
-          : {
-            $unset: {
-              otpHash: '',
-              otpExpiresAt: '',
-              otpLastSentAt: '',
-              pendingName: '',
-              pendingMobileNumber: '',
-            },
-            $set: { otpAttempts: 0 },
-          }
+        const restoreFields = {}
+        const unsetFields = {}
 
-        await User.updateOne({ _id: reservedUser._id, otpHash }, recoveryUpdate)
+        for (const [field, value] of Object.entries(previousOtpState)) {
+          if (value === undefined || value === null) {
+            unsetFields[field] = ''
+          } else {
+            restoreFields[field] = value
+          }
+        }
+
+        const rollback = await User.updateOne(
+          {
+            _id: reservedUser._id,
+            otpHash,
+            otpLastSentAt: sentAt,
+          },
+          {
+            ...(Object.keys(restoreFields).length
+              ? { $set: restoreFields }
+              : {}),
+            ...(Object.keys(unsetFields).length
+              ? { $unset: unsetFields }
+              : {}),
+          }
+        )
+
+        if (!rollback.matchedCount) {
+          logOtpEvent('send-rollback-skipped-state-changed', { requestId })
+        }
       } catch (cleanupError) {
-        console.error('Failed to clear undelivered OTP:', cleanupError.message)
+        logOtpEvent('send-rollback-failed', {
+          requestId,
+          errorName: cleanupError.name,
+        })
       }
 
       throw mailError
     }
 
+    logOtpEvent('send-succeeded', { requestId })
     return res.json({
       message: 'Verification code sent to your email.',
       email,
@@ -269,10 +311,12 @@ router.post('/send-otp', async (req, res) => {
       resendAfterSeconds: OTP_RESEND_COOLDOWN_MS / 1000,
     })
   } catch (error) {
-    console.error('Failed to send account verification code:', {
+    logOtpEvent('send-failed', {
+      requestId,
+      stage,
       status: error?.status,
-      message: error?.message,
       providerError: error?.providerError,
+      errorName: error?.name,
     })
 
     const isConfigurationError =
@@ -308,6 +352,9 @@ router.post('/send-otp', async (req, res) => {
 
 // Verify email OTP and create a 30-day session
 router.post('/verify-otp', async (req, res) => {
+  const requestId = crypto.randomUUID()
+  let stage = 'validate'
+
   try {
     const email = normalizeEmail(req.body.email)
     const otp = String(req.body.otp || '').trim()
@@ -319,10 +366,18 @@ router.post('/verify-otp', async (req, res) => {
       })
     }
 
+    stage = 'load-user'
     const user = await User.findOne({ email })
       .select(
         '+otpHash +otpExpiresAt +previousOtpHash +previousOtpExpiresAt +pendingName +pendingMobileNumber +otpAttempts'
       )
+
+    if (!user) {
+      logOtpEvent('verify-user-not-found', { requestId })
+      return res.status(400).json({
+        message: 'No verification request was found for this email. Request a new code.',
+      })
+    }
 
     const now = new Date()
     const activeOtpHashes = [
@@ -345,6 +400,10 @@ router.post('/verify-otp', async (req, res) => {
     ].filter(Boolean)
 
     if (!activeOtpHashes.length) {
+      const hasStoredOtp = Boolean(user.otpHash || user.previousOtpHash)
+      logOtpEvent(hasStoredOtp ? 'verify-otp-expired' : 'verify-no-active-otp', {
+        requestId,
+      })
       return res.status(400).json({
         message:
           'Invalid or expired verification code. Request a new code.',
@@ -352,6 +411,7 @@ router.post('/verify-otp', async (req, res) => {
     }
 
     const submittedHash = Buffer.from(hashOtp(otp), 'hex')
+    stage = 'compare-code'
     const matchedOtp = activeOtpHashes.find(({ hash }) => {
       const storedHash = Buffer.from(hash, 'hex')
       return submittedHash.length === storedHash.length &&
@@ -366,11 +426,20 @@ router.post('/verify-otp', async (req, res) => {
     )
 
     if (!matchedOtp) {
+      logOtpEvent('verify-hash-mismatch', { requestId })
+      stage = 'increment-failed-attempt'
       const failedAttempt = await User.findOneAndUpdate(
         {
           _id: user._id,
-          otpAttempts: { $lt: OTP_MAX_ATTEMPTS },
-          $or: activeOtpConditions,
+          $and: [
+            { $or: activeOtpConditions },
+            {
+              $or: [
+                { otpAttempts: { $lt: OTP_MAX_ATTEMPTS } },
+                { otpAttempts: { $exists: false } },
+              ],
+            },
+          ],
         },
         { $inc: { otpAttempts: 1 } },
         { new: true }
@@ -381,12 +450,12 @@ router.post('/verify-otp', async (req, res) => {
           .select('+otpHash +previousOtpHash +otpAttempts')
 
         if (latestUser?.otpAttempts >= OTP_MAX_ATTEMPTS) {
+          logOtpEvent('verify-max-attempts-reached', { requestId })
           await User.updateOne(
             {
               _id: latestUser._id,
-              $or: activeOtpHashes.map(({ hash, field }) => ({
-                [field]: hash,
-              })),
+              otpAttempts: { $gte: OTP_MAX_ATTEMPTS },
+              $and: [{ $or: activeOtpConditions }],
             },
             {
               $unset: {
@@ -407,18 +476,19 @@ router.post('/verify-otp', async (req, res) => {
           })
         }
 
+        logOtpEvent('verify-state-changed-during-attempt-update', { requestId })
         return res.status(400).json({
           message: 'Your verification code changed or expired. Request a new code and try again.',
         })
       }
 
       if (failedAttempt.otpAttempts >= OTP_MAX_ATTEMPTS) {
+        logOtpEvent('verify-max-attempts-reached', { requestId })
         await User.updateOne(
           {
             _id: failedAttempt._id,
-            $or: activeOtpHashes.map(({ hash, field }) => ({
-              [field]: hash,
-            })),
+            otpAttempts: { $gte: OTP_MAX_ATTEMPTS },
+            $and: [{ $or: activeOtpConditions }],
           },
           {
             $unset: {
@@ -455,6 +525,7 @@ router.post('/verify-otp', async (req, res) => {
     }
 
     // Consume the OTP after successful verification.
+    stage = 'consume-otp'
     const matchedOtpCondition = {
       [matchedOtp.field]: matchedOtp.hash,
       [matchedOtp.expiryField]: { $gt: new Date() },
@@ -493,11 +564,13 @@ router.post('/verify-otp', async (req, res) => {
     )
 
     if (!verifiedUser) {
+      logOtpEvent('verify-state-changed-before-consume', { requestId })
       return res.status(400).json({
         message: 'This verification code has expired or was already used. Request a new code.',
       })
     }
 
+    stage = 'create-session'
     const token = jwt.sign(
       {
         id: String(verifiedUser._id),
@@ -509,6 +582,7 @@ router.post('/verify-otp', async (req, res) => {
     )
 
     res.cookie(USER_SESSION_COOKIE, token, sessionCookieOptions)
+    logOtpEvent('verify-succeeded', { requestId })
     return res.json({
       user: {
         id: String(verifiedUser._id),
@@ -519,7 +593,11 @@ router.post('/verify-otp', async (req, res) => {
       },
     })
   } catch (error) {
-    console.error('Failed to verify user account:', error.message)
+    logOtpEvent('verify-failed', {
+      requestId,
+      stage,
+      errorName: error?.name,
+    })
 
     return res.status(500).json({
       message: 'Unable to verify your account. Please try again.',
