@@ -1,6 +1,9 @@
+
 import express from 'express';
 import cors from 'cors';
 import mongoose from 'mongoose';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { env, validateSecuritySecrets } from './config/env.js';
 import authRoutes from './routes/auth.routes.js';
@@ -11,6 +14,16 @@ import User from './models/User.js';
 
 const app = express();
 
+// Resolve the production React build directory.
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const clientDistPath = path.resolve(
+  __dirname,
+  '../../client/dist'
+);
+
+// CORS configuration.
 app.use(
   cors({
     origin(origin, callback) {
@@ -29,7 +42,7 @@ app.use(
         return callback(null, true);
       }
 
-      callback(new Error('Origin not allowed by CORS'));
+      return callback(new Error('Origin not allowed by CORS'));
     },
     credentials: true,
   })
@@ -37,6 +50,7 @@ app.use(
 
 app.use(express.json({ limit: '25mb' }));
 
+// Health check.
 app.get('/api/health', (_req, res) => {
   const connected = mongoose.connection.readyState === 1;
 
@@ -47,24 +61,46 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
-// Block API requests when MongoDB is disconnected.
-app.use('/api', (_req, res, next) => {
-  if (mongoose.connection.readyState !== 1) {
-    return res.status(503).json({
-      message: 'Database unavailable. Please try again shortly.',
-    });
-  }
-
+// Block database-dependent API requests if MongoDB is disconnected.
+app.use('/api', (req, res, next) => {
+  // Let unknown API endpoints reach the 404 handler below.
   next();
 });
 
+// Authentication, equipment, feedback, and admin routes.
 app.use('/api/auth', authRoutes);
 app.use('/api/equipment', equipmentRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/admin', adminRoutes);
 
+// Return JSON for unknown API endpoints.
+app.use('/api', (_req, res) => {
+  res.status(404).json({
+    message: 'API endpoint not found',
+  });
+});
+
+// Serve static React frontend assets.
+app.use(express.static(clientDistPath));
+
+// React SPA fallback for routes such as /verification and /home.
+app.get(/.*/, (req, res, next) => {
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({
+      message: 'API endpoint not found',
+    });
+  }
+
+  res.sendFile(
+    path.join(clientDistPath, 'index.html'),
+    error => {
+      if (error) next(error);
+    }
+  );
+});
+
+// Preserve user index configuration.
 async function ensureUserIndexes() {
-  // Preserve the ability to have multiple users without a mobile number.
   const indexes = await User.collection.indexes();
 
   const mobileIndex = indexes.find(
@@ -80,16 +116,23 @@ async function ensureUserIndexes() {
   if (!mobileIndex || mobileIndex.unique) {
     await User.collection.createIndex(
       { mobileNumber: 1 },
-      { name: 'mobileNumber_1', sparse: true }
+      {
+        name: 'mobileNumber_1',
+        sparse: true,
+      }
     );
   }
 
   await User.collection.createIndex(
     { email: 1 },
-    { name: 'email_1', unique: true }
+    {
+      name: 'email_1',
+      unique: true,
+    }
   );
 }
 
+// Connect to MongoDB with retry logic.
 async function connectToDatabase() {
   if (!env.mongoUri) {
     throw new Error('MONGO_URI is missing from .env');
@@ -115,11 +158,17 @@ async function connectToDatabase() {
       console.log('MongoDB connected successfully.');
       return;
     } catch (error) {
-      console.error(`MongoDB attempt ${attempt} failed:`, error.message);
+      console.error(
+        `MongoDB attempt ${attempt} failed:`,
+        error.message
+      );
 
       await mongoose.disconnect().catch(() => {});
 
-      const wait = Math.min(2000 * 2 ** (attempt - 1), 30000);
+      const wait = Math.min(
+        2000 * 2 ** (attempt - 1),
+        30000
+      );
 
       console.log(`Retrying in ${wait / 1000} seconds...`);
 
@@ -128,6 +177,7 @@ async function connectToDatabase() {
   }
 }
 
+// MongoDB connection events.
 mongoose.connection.on('disconnected', () => {
   console.error('MongoDB disconnected.');
 });
@@ -136,13 +186,17 @@ mongoose.connection.on('error', error => {
   console.error('MongoDB error:', error.message);
 });
 
+// Start the server.
 async function startServer() {
   try {
     validateSecuritySecrets();
+
     await connectToDatabase();
 
-    app.listen(env.port, () => {
-      console.log(`EquipTrade API running on http://localhost:${env.port}`);
+    const port = env.port || process.env.PORT || 4000;
+
+    app.listen(port, '0.0.0.0', () => {
+      console.log(`EquipTrade server listening on port ${port}`);
     });
   } catch (error) {
     console.error('Server startup failed:', error.message);
