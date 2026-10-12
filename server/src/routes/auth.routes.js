@@ -275,6 +275,14 @@ router.post('/send-otp', async (req, res) => {
       throw mailError
     }
 
+    console.info('OTP email delivered', {
+      userId: String(reservedUser._id),
+      accountPreviouslyVerified: Boolean(user.verified),
+      otpExpiresAt: expiresAt.toISOString(),
+      backendCommit: process.env.RENDER_GIT_COMMIT || 'unknown',
+      backendInstance: process.env.RENDER_INSTANCE_ID || 'unknown',
+    })
+
     return res.json({
       message: 'Verification code sent to your email.',
       email,
@@ -369,6 +377,21 @@ router.post('/verify-otp', async (req, res) => {
       return submittedHash.length === storedHash.length &&
         crypto.timingSafeEqual(submittedHash, storedHash)
     })
+
+    if (!matchedOtp) {
+      console.warn('OTP verification mismatch', {
+        userId: String(user._id),
+        currentOtpActive: activeOtpHashes.some(
+          ({ field }) => field === 'otpHash'
+        ),
+        previousOtpActive: activeOtpHashes.some(
+          ({ field }) => field === 'previousOtpHash'
+        ),
+        otpAttempts: user.otpAttempts || 0,
+        backendCommit: process.env.RENDER_GIT_COMMIT || 'unknown',
+        backendInstance: process.env.RENDER_INSTANCE_ID || 'unknown',
+      })
+    }
 
     const activeOtpConditions = activeOtpHashes.map(
       ({ hash, field, expiryField }) => ({
