@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   ArrowRight,
   ClipboardCheck,
@@ -126,6 +126,22 @@ export default function Sell({
   const [images, setImages] = useState([])
 
   const fileInputRef = useRef(null)
+  const previousStep = useRef(step)
+
+  useEffect(() => {
+    if (step > previousStep.current) {
+      const prefersReducedMotion = window.matchMedia(
+        '(prefers-reduced-motion: reduce)'
+      ).matches
+
+      window.scrollTo({
+        top: 0,
+        behavior: prefersReducedMotion ? 'auto' : 'smooth',
+      })
+    }
+
+    previousStep.current = step
+  }, [step])
 
   const [form, setForm] = useState({
     listingType: 'sale',

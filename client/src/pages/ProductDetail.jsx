@@ -213,7 +213,20 @@ export default function ProductDetail({
   }, [slug])
 
   useEffect(() => {
-    if (!item || !matchesProductSlug(item, slug)) {
+    const selectedProduct =
+      initialProduct && matchesProductSlug(initialProduct, slug)
+        ? initialProduct
+        : item
+
+    if (selectedProduct && selectedProduct !== item) {
+      setItem(selectedProduct)
+      setCachedProduct(slug, selectedProduct)
+      setActiveImage(0)
+      setError('')
+      setLoading(false)
+    }
+
+    if (!selectedProduct || !matchesProductSlug(selectedProduct, slug)) {
       loadProduct()
       return () => {
         productRequestVersion.current += 1
@@ -240,7 +253,7 @@ export default function ProductDetail({
         active = false
       }
     }
-  }, [slug, loadProduct])
+  }, [slug, loadProduct, initialProduct])
 
   // Images list
   const images = useMemo(() => {
@@ -883,7 +896,7 @@ export default function ProductDetail({
             </button>
           </div>
 
-          <div className="listing-grid">
+          <div className="listing-grid pd-related-grid">
             {relatedListings.map(rel => (
               <EquipmentCard
                 key={rel._id || rel.id}
@@ -892,7 +905,7 @@ export default function ProductDetail({
                 onClick={() =>
                   navigate('product-detail', {
                     product: rel,
-                    slug: toProductSlug(rel.name),
+                    slug: String(rel._id || rel.id || toProductSlug(rel.name)),
                   })
                 }
               />

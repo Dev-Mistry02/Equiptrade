@@ -609,6 +609,25 @@
   margin: 6px 0 0;
 }
 
+.pd-related-grid {
+  grid-auto-columns: minmax(260px, 31%);
+  grid-auto-flow: column;
+  grid-template-columns: unset;
+  gap: 16px;
+  padding: 2px 2px 12px;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scroll-snap-type: inline mandatory;
+  scrollbar-color: #7f999d transparent;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.pd-related-grid .equipment-card {
+  min-width: 0;
+  scroll-snap-align: start;
+}
+
 /* ---------------- Sticky Mobile Enquiry Bar ---------------- */
 .pd-mobile-sticky-bar {
   display: none;
@@ -675,6 +694,24 @@
   .pd-main-grid {
     grid-template-columns: 1fr;
     gap: 24px;
+  }
+
+  .pd-related-header {
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .pd-related-header h3 {
+    font-size: 21px;
+  }
+
+  .pd-related-header .heading-link {
+    flex: 0 0 auto;
+  }
+
+  .pd-related-grid {
+    grid-auto-columns: minmax(260px, 82%);
+    gap: 12px;
   }
 
   .pd-main-image-wrap {
