@@ -66,7 +66,11 @@ router.post('/admin-login', async (req, res) => {
 router.get('/session', async (req, res) => {
   try {
     let user = null
-    const userToken = getRequestCookie(req, USER_SESSION_COOKIE)
+    const authorization = req.headers.authorization || ''
+    const userToken =
+      (authorization.startsWith('Bearer ')
+        ? authorization.slice(7)
+        : '') || getRequestCookie(req, USER_SESSION_COOKIE)
 
     if (userToken) {
       try {
@@ -385,6 +389,7 @@ router.post('/verify-otp', async (req, res) => {
     )
     res.cookie(USER_SESSION_COOKIE, token, sessionCookieOptions)
     return res.json({
+      token,
       user: {
         id: String(verifiedUser._id),
         name: verifiedUser.name,

@@ -29,13 +29,47 @@ export const API_URL = useDevelopmentProxy
     ? baseApiUrl.replace(/\/+$/, '')
     : `${baseApiUrl.replace(/\/+$/, '')}/api`
 
+const USER_ACCESS_TOKEN_KEY = 'equiptrade_user_access_token'
+
+function getUserAccessToken() {
+  try {
+    return localStorage.getItem(USER_ACCESS_TOKEN_KEY) || ''
+  } catch (error) {
+    console.warn('Unable to read the saved sign-in session:', error)
+    return ''
+  }
+}
+
+export function storeUserAccessToken(token) {
+  if (typeof token !== 'string' || !token) return
+  try {
+    localStorage.setItem(USER_ACCESS_TOKEN_KEY, token)
+  } catch (error) {
+    console.warn('Unable to persist the sign-in session on this device:', error)
+  }
+}
+
+export function clearUserAccessToken() {
+  try {
+    localStorage.removeItem(USER_ACCESS_TOKEN_KEY)
+  } catch (error) {
+    console.warn('Unable to clear the saved sign-in session:', error)
+  }
+}
+
 async function request(path, options = {}) {
   let response
   const { timeoutMs = 15000, ...fetchOptions } = options
 
   try {
+    const accessToken = getUserAccessToken()
+    const isAdminRequest =
+      path.startsWith('/admin') || path.startsWith('/auth/admin-')
     const headers = {
       'Content-Type': 'application/json',
+      ...(accessToken && !isAdminRequest
+        ? { Authorization: `Bearer ${accessToken}` }
+        : {}),
       ...(fetchOptions.headers || {}),
     }
 

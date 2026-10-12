@@ -27,7 +27,12 @@ import {
   X,
   Zap,
 } from 'lucide-react'
-import { API_URL, api } from './api'
+import {
+  API_URL,
+  api,
+  clearUserAccessToken,
+  storeUserAccessToken,
+} from './api'
 import { toggleSavedListing } from './savedListings'
 import { categories, equipment } from './data'
 import { toProductSlug } from './productSlug'
@@ -271,6 +276,9 @@ function App() {
       try {
         const session = await api.getSession()
         if (!active || requestId !== latestSessionRequest) return
+        if (!session.user) {
+          clearUserAccessToken()
+        }
         setUser(session.user || null)
         setVerified(Boolean(session.user))
         setAdminAuthenticated(Boolean(session.adminAuthenticated))
@@ -290,6 +298,7 @@ function App() {
         setAdminAuthenticated(false)
         return
       }
+      clearUserAccessToken()
       setUser(null)
       setVerified(false)
       setProfileOpen(false)
@@ -579,11 +588,14 @@ function App() {
     }
   }
 
-  const completeVerification = verifiedUser => {
+  const completeVerification = (verifiedUser, accessToken) => {
     if (!verifiedUser?.id || !verifiedUser.verified) {
       throw new Error('No verified account was returned. Please try again.')
     }
 
+    if (accessToken) {
+      storeUserAccessToken(accessToken)
+    }
     setUser(verifiedUser)
     setVerified(true)
     window.dispatchEvent(new Event('equiptrade:session-changed'))
@@ -625,7 +637,7 @@ function App() {
         otp,
       })
 
-      completeVerification(response.user)
+      completeVerification(response.user, response.token)
     } catch (error) {
       if (!error.status || error.status >= 500) {
         try {
@@ -655,6 +667,7 @@ function App() {
     } catch (error) {
       notify(`Unable to end the server session: ${error.message}`)
     } finally {
+      clearUserAccessToken()
       window.dispatchEvent(new Event('equiptrade:session-changed'))
     }
     localStorage.removeItem(
