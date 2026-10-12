@@ -139,11 +139,45 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 
-  getHomeEquipment: options =>
-    request('/equipment/home', {
-      timeoutMs: COLD_START_TIMEOUT_MS,
-      ...options,
-    }),
+  getHomeEquipment: async options => {
+    try {
+      return await request('/equipment/home', {
+        timeoutMs: COLD_START_TIMEOUT_MS,
+        cache: 'default',
+        ...options,
+      })
+    } catch (error) {
+      if (
+        error.status !== 404 ||
+        error.message !== 'Equipment listing not found.'
+      ) {
+        throw error
+      }
+
+      const listings = await api.getEquipment(undefined, options)
+      const categoryCounts = new Map()
+
+      listings.forEach(listing => {
+        if (listing.category) {
+          categoryCounts.set(
+            listing.category,
+            (categoryCounts.get(listing.category) || 0) + 1
+          )
+        }
+      })
+
+      return {
+        listings: listings.slice(0, 3).map(listing => ({
+          ...listing,
+          images: listing.images?.slice(0, 1) || [],
+        })),
+        categories: [...categoryCounts]
+          .sort(([left], [right]) => left.localeCompare(right))
+          .map(([name, count]) => ({ name, count })),
+        totalListings: listings.length,
+      }
+    }
+  },
 
   getEquipment: (filters, options = {}) => {
     const params = new URLSearchParams()

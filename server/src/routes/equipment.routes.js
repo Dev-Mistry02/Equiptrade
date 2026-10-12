@@ -55,6 +55,7 @@ router.get('/home', async (_req, res) => {
       },
     ])
 
+    res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300')
     return res.json({
       listings: summary?.listings || [],
       categories: summary?.categories || [],

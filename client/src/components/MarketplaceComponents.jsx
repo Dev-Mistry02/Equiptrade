@@ -2,17 +2,43 @@ import { ArrowRight, BadgeCheck, Building2, Heart } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { isListingSaved, savedListingsChangedEvent } from '../savedListings'
 
-export function EquipmentCard({ item, onClick, onSave }) {
+function getResponsiveImageSource(image, width) {
+  try {
+    const url = new URL(image)
+    if (url.hostname !== 'res.cloudinary.com') return ''
+
+    const uploadPath = '/image/upload/'
+    const uploadIndex = url.pathname.indexOf(uploadPath)
+    if (uploadIndex < 0) return ''
+
+    const insertAt = uploadIndex + uploadPath.length
+    url.pathname = `${url.pathname.slice(0, insertAt)}f_auto,q_auto:eco,w_${width},c_limit/${url.pathname.slice(insertAt)}`
+    return url.toString()
+  } catch {
+    return ''
+  }
+}
+
+export function EquipmentCard({ item, onClick, onSave, imageSizes }) {
   const image = item.images?.[0]
   const listingId = item._id || item.id
   const [saved, setSaved] = useState(() => isListingSaved(listingId))
 
   useEffect(() => {
     const syncSavedState = () => setSaved(isListingSaved(listingId))
-    syncSavedState()
     window.addEventListener(savedListingsChangedEvent, syncSavedState)
     return () => window.removeEventListener(savedListingsChangedEvent, syncSavedState)
   }, [listingId])
+
+  const responsiveImageSet = image
+    ? [320, 480, 640, 960]
+      .map(width => {
+        const src = getResponsiveImageSource(image, width)
+        return src ? `${src} ${width}w` : ''
+      })
+      .filter(Boolean)
+      .join(', ')
+    : ''
 
   return (
     <article
@@ -35,8 +61,12 @@ export function EquipmentCard({ item, onClick, onSave }) {
       <div className="equipment-image">
         {image ? (
           <img
-            src={image}
+            src={getResponsiveImageSource(image, 640) || image}
+            srcSet={responsiveImageSet || undefined}
+            sizes={imageSizes || '(max-width: 700px) 90vw, (max-width: 1000px) 45vw, 33vw'}
             alt={item.name}
+            width="800"
+            height="550"
             loading="lazy"
             decoding="async"
           />
