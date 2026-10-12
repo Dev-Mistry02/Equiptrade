@@ -5,21 +5,25 @@ import { EquipmentCard, Process, SectionHeading } from '../components/Marketplac
 import { getCachedListings, setCachedListings } from '../marketplaceCache'
 
 export default function Home({ navigate, setSelected, onSaveListing, search, setSearch }) {
-  const cachedEquipment = getCachedListings()
-  const [equipment, setEquipment] = useState(() => cachedEquipment || [])
-  const [loading, setLoading] = useState(() => !cachedEquipment)
+  const cachedHomeData = getCachedListings('home')
+  const [homeData, setHomeData] = useState(() => cachedHomeData || {
+    listings: [],
+    categories: [],
+    totalListings: 0,
+  })
+  const [loading, setLoading] = useState(() => !cachedHomeData)
   const [error, setError] = useState('')
   const loadEquipment = useCallback(async () => {
-    const hasCachedEquipment = Boolean(getCachedListings())
-    if (!hasCachedEquipment) setLoading(true)
+    const cached = Boolean(getCachedListings('home'))
+    if (!cached) setLoading(true)
     setError('')
 
     try {
-      const listings = await api.getEquipment()
-      setCachedListings('all', listings)
-      setEquipment(listings)
+      const data = await api.getHomeEquipment()
+      setCachedListings('home', data)
+      setHomeData(data)
     } catch (requestError) {
-      if (hasCachedEquipment) {
+      if (cached) {
         console.warn('Unable to refresh cached marketplace listings:', requestError)
       } else {
         setError(requestError.message || 'Unable to load equipment.')
@@ -32,7 +36,8 @@ export default function Home({ navigate, setSelected, onSaveListing, search, set
   useEffect(() => {
     loadEquipment()
   }, [loadEquipment])
-  const categoryNames = [...new Set(equipment.map(item => item.category).filter(Boolean))]
+  const equipment = homeData.listings
+  const categoryNames = homeData.categories
   return (
     <main className="home-page">
       <section className="home-hero">
@@ -61,7 +66,7 @@ export default function Home({ navigate, setSelected, onSaveListing, search, set
                 fetchPriority="high"
                 decoding="async"
               />
-              <div className="image-label"><span className="status-dot" /> The equipment marketplace <strong>{equipment.length}</strong> listings</div>
+              <div className="image-label"><span className="status-dot" /> The equipment marketplace <strong>{homeData.totalListings}</strong> listings</div>
             </div>
             <div className="floating-stat"><span className="stat-icon"><BadgeCheck size={20} /></span><div><strong>Verified</strong><small>Every listing reviewed</small></div></div>
             <div className="hero-image-note"><span>01</span><span>Machines for real work.</span></div>
@@ -93,7 +98,7 @@ export default function Home({ navigate, setSelected, onSaveListing, search, set
       <section className="section container home-categories">
         <SectionHeading eyebrow="The right tool for the job" title="Explore equipment" link="All equipment" onClick={() => navigate('browse')} />
         <p className="home-section-intro">Browse popular categories and get straight to the machines your work needs.</p>
-        {loading ? <p className="home-state">Loading categories...</p> : error ? <div className="home-state"><p className="data-error">{error}</p><button className="button button-dark" onClick={loadEquipment}>Try again</button></div> : categoryNames.length ? <div className="category-grid">{categoryNames.map((name, index) => <button className="category-card" key={name} onClick={() => { setSearch(name); navigate('browse') }}><span className={`category-icon ${['blue', 'amber', 'green', 'rose'][index % 4]}`}>⚙</span><span className="category-name">{name}</span><span className="category-count">{equipment.filter(item => item.category === name).length} listings <ArrowRight size={14} /></span></button>)}</div> : <p className="home-state">No published categories yet.</p>}
+        {loading ? <p className="home-state">Loading categories...</p> : error ? <div className="home-state"><p className="data-error">{error}</p><button className="button button-dark" onClick={loadEquipment}>Try again</button></div> : categoryNames.length ? <div className="category-grid">{categoryNames.map((category, index) => <button className="category-card" key={category.name} onClick={() => { setSearch(category.name); navigate('browse') }}><span className={`category-icon ${['blue', 'amber', 'green', 'rose'][index % 4]}`}>⚙</span><span className="category-name">{category.name}</span><span className="category-count">{category.count} listings <ArrowRight size={14} /></span></button>)}</div> : <p className="home-state">No published categories yet.</p>}
       </section>
 
       <section className="section section-muted home-featured">

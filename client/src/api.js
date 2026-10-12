@@ -139,6 +139,12 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 
+  getHomeEquipment: options =>
+    request('/equipment/home', {
+      timeoutMs: COLD_START_TIMEOUT_MS,
+      ...options,
+    }),
+
   getEquipment: (filters, options = {}) => {
     const params = new URLSearchParams()
 

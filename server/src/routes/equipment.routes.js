@@ -9,6 +9,65 @@ import {
 
 const router = Router()
 
+router.get('/home', async (_req, res) => {
+  try {
+    const [summary] = await Equipment.aggregate([
+      { $match: { status: { $in: ['approved', 'published'] } } },
+      {
+        $facet: {
+          listings: [
+            { $sort: { createdAt: -1 } },
+            { $limit: 3 },
+            {
+              $project: {
+                name: 1,
+                category: 1,
+                brand: 1,
+                model: 1,
+                year: 1,
+                condition: 1,
+                listingType: 1,
+                price: 1,
+                location: 1,
+                images: { $slice: ['$images', 1] },
+              },
+            },
+          ],
+          categories: [
+            { $match: { category: { $type: 'string', $ne: '' } } },
+            {
+              $group: {
+                _id: '$category',
+                count: { $sum: 1 },
+              },
+            },
+            { $sort: { _id: 1 } },
+            {
+              $project: {
+                _id: 0,
+                name: '$_id',
+                count: 1,
+              },
+            },
+          ],
+          total: [{ $count: 'count' }],
+        },
+      },
+    ])
+
+    return res.json({
+      listings: summary?.listings || [],
+      categories: summary?.categories || [],
+      totalListings: summary?.total[0]?.count || 0,
+    })
+  } catch (error) {
+    console.error('Failed to load home marketplace summary:', error)
+    return res.status(500).json({
+      message: 'Unable to load marketplace highlights. Please try again.',
+    })
+  }
+})
+
 router.get('/', async (req, res) => {
   try {
     const query = { status: { $in: ['approved', 'published'] } }
