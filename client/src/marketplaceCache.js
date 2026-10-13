@@ -1,6 +1,19 @@
 const listingCache = new Map()
 const productCache = new Map()
 const CACHE_LIMIT = 30
+const HOME_CACHE_KEY = 'equiptrade_home_cache_v1'
+const HOME_CACHE_TTL_MS = 5 * 60 * 1000
+
+function isHomeData(value) {
+  return (
+    value &&
+    typeof value === 'object' &&
+    Array.isArray(value.listings) &&
+    Array.isArray(value.categories) &&
+    Number.isFinite(value.totalListings) &&
+    value.totalListings >= 0
+  )
+}
 
 function readCache(cache, key) {
   if (!cache.has(key)) return undefined
@@ -21,11 +34,46 @@ function writeCache(cache, key, value) {
 }
 
 export function getCachedListings(key = 'all') {
-  return readCache(listingCache, key)
+  const cached = readCache(listingCache, key)
+  if (cached !== undefined || key !== 'home') return cached
+
+  try {
+    const stored = localStorage.getItem(HOME_CACHE_KEY)
+    if (!stored) return undefined
+
+    const { data, cachedAt } = JSON.parse(stored)
+    const age = Date.now() - cachedAt
+    if (
+      !isHomeData(data) ||
+      !Number.isFinite(cachedAt) ||
+      age < 0 ||
+      age >= HOME_CACHE_TTL_MS
+    ) {
+      localStorage.removeItem(HOME_CACHE_KEY)
+      return undefined
+    }
+
+    writeCache(listingCache, key, data)
+    return data
+  } catch (error) {
+    console.warn('Unable to read cached marketplace listings:', error)
+    return undefined
+  }
 }
 
 export function setCachedListings(key, listings) {
   writeCache(listingCache, key, listings)
+
+  if (key === 'home') {
+    try {
+      localStorage.setItem(
+        HOME_CACHE_KEY,
+        JSON.stringify({ data: listings, cachedAt: Date.now() })
+      )
+    } catch (error) {
+      console.warn('Unable to save cached marketplace listings:', error)
+    }
+  }
 }
 
 export function getCachedProduct(slug) {
