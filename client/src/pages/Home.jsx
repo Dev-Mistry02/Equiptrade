@@ -96,12 +96,12 @@ export default function Home({ navigate, setSelected, onSaveListing, search, set
             <div className="hero-image">
               <picture>
                 <img
-                  src="https://images.unsplash.com/photo-1565793298595-6a879b1d9492?auto=format&fit=crop&w=640&q=68"
-                  srcSet={[
-                    'https://images.unsplash.com/photo-1565793298595-6a879b1d9492?auto=format&fit=crop&w=640&q=68 640w',
-                    'https://images.unsplash.com/photo-1565793298595-6a879b1d9492?auto=format&fit=crop&w=900&q=70 900w',
-                    'https://images.unsplash.com/photo-1565793298595-6a879b1d9492?auto=format&fit=crop&w=1200&q=72 1200w',
-                  ].join(', ')}
+                  src="/equipment.png"
+                  // srcSet={[
+                  //   'https://images.unsplash.com/photo-1565793298595-6a879b1d9492?auto=format&fit=crop&w=640&q=68 640w',
+                  //   'https://images.unsplash.com/photo-1565793298595-6a879b1d9492?auto=format&fit=crop&w=900&q=70 900w',
+                  //   'https://images.unsplash.com/photo-1565793298595-6a879b1d9492?auto=format&fit=crop&w=1200&q=72 1200w',
+                  // ].join(', ')}
                   sizes="(max-width: 1100px) 45vw, 540px"
                   alt="Industrial machinery in a modern workshop"
                   width="900"
@@ -147,9 +147,12 @@ export default function Home({ navigate, setSelected, onSaveListing, search, set
 
       <section className="section section-muted home-featured">
         <div className="container">
-          <SectionHeading eyebrow="Inspected. Approved. Ready." title="Recently verified" link="Browse all equipment" onClick={() => navigate('browse')} />
+          <SectionHeading eyebrow="Inspected. Approved. Ready." title="Recently verified" />
           <p className="home-section-intro">A closer look at equipment that has passed our review.</p>
-          {loading ? <p className="home-state">Loading listings...</p> : error ? <div className="home-state"><p className="data-error">{error}</p><button className="button button-dark" onClick={loadEquipment}>Try again</button></div> : equipment.length ? <div className="listing-grid">{equipment.slice(0, 3).map(item => <EquipmentCard item={item} key={item._id} onClick={() => setSelected(item)} onSave={onSaveListing} imageSizes="(max-width: 700px) 90vw, (max-width: 1000px) 45vw, 360px" />)}</div> : <p className="home-state">No approved equipment yet.</p>}
+          {loading ? <p className="home-state">Loading listings...</p> : error ? <div className="home-state"><p className="data-error">{error}</p><button className="button button-dark" onClick={loadEquipment}>Try again</button></div> : equipment.length ? <>
+            <div className="listing-grid home-featured-grid">{equipment.slice(0, 4).map(item => <EquipmentCard item={item} key={item._id} onClick={() => setSelected(item)} onSave={onSaveListing} imageSizes="(max-width: 700px) 45vw, (max-width: 1099px) 33vw, 25vw" />)}</div>
+            <button className="home-browse-all-button" onClick={() => navigate('browse')}>Browse all equipment <ArrowRight size={17} /></button>
+          </> : <p className="home-state">No approved equipment yet.</p>}
         </div>
       </section>
 

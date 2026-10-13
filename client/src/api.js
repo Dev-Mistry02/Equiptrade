@@ -175,11 +175,28 @@ export const api = {
 
   getHomeEquipment: async options => {
     try {
-      return await request('/equipment/home', {
+      const homeData = await request('/equipment/home', {
         timeoutMs: COLD_START_TIMEOUT_MS,
         cache: 'default',
         ...options,
       })
+
+      if (
+        homeData.listings.length < 4 &&
+        (homeData.totalListings == null ||
+          homeData.totalListings > homeData.listings.length)
+      ) {
+        const listings = await api.getEquipment(undefined, options)
+        return {
+          ...homeData,
+          listings: listings.slice(0, 4).map(listing => ({
+            ...listing,
+            images: listing.images?.slice(0, 1) || [],
+          })),
+        }
+      }
+
+      return homeData
     } catch (error) {
       if (
         error.status !== 404 ||
@@ -201,7 +218,7 @@ export const api = {
       })
 
       return {
-        listings: listings.slice(0, 3).map(listing => ({
+        listings: listings.slice(0, 4).map(listing => ({
           ...listing,
           images: listing.images?.slice(0, 1) || [],
         })),

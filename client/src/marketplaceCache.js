@@ -1,7 +1,7 @@
 const listingCache = new Map()
 const productCache = new Map()
 const CACHE_LIMIT = 30
-const HOME_CACHE_KEY = 'equiptrade_home_cache_v1'
+const HOME_CACHE_KEY = 'equiptrade_home_cache_v2'
 const HOME_CACHE_TTL_MS = 5 * 60 * 1000
 
 function isHomeData(value) {

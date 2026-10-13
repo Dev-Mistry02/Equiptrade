@@ -17,7 +17,7 @@ router.get('/home', async (_req, res) => {
         $facet: {
           listings: [
             { $sort: { createdAt: -1 } },
-            { $limit: 3 },
+            { $limit: 4 },
             {
               $project: {
                 name: 1,
@@ -55,7 +55,7 @@ router.get('/home', async (_req, res) => {
       },
     ])
 
-    res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300')
+    res.set('Cache-Control', 'no-store')
     return res.json({
       listings: summary?.listings || [],
       categories: summary?.categories || [],

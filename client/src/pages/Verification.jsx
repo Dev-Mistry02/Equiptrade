@@ -60,6 +60,10 @@ export default function Verification({
         <section className="verification-card">
           {step === 'details' ? (
             <>
+              <div className="verification-progress" aria-hidden="true">
+                <span className="is-current" />
+                <span />
+              </div>
               <span className="eyebrow">Step 1 of 2</span>
               <h2>Tell us about yourself.</h2>
               <p>We’ll send a one-time code to verify your email address.</p>
@@ -112,6 +116,10 @@ export default function Verification({
           ) : (
             <>
               <div className="otp-icon"><Mail size={23} /></div>
+              <div className="verification-progress" aria-hidden="true">
+                <span className="is-complete" />
+                <span className="is-current" />
+              </div>
 
               <div className="otp-heading-row">
                 <span className="eyebrow">Step 2 of 2</span>
