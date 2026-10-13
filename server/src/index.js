@@ -22,25 +22,19 @@ const clientDistPath = path.resolve(
   '../../client/dist'
 );
 
-// MongoDB connection configuration.
 const MONGO_OPTIONS = {
-  // Prefer IPv4 for compatibility with many networks.
   family: 4,
 
-  // Fail faster when Atlas cannot be reached.
   serverSelectionTimeoutMS: 10000,
   connectTimeoutMS: 10000,
 
-  // Connection pool.
   maxPoolSize: 10,
   minPoolSize: 0,
 
-  // Keep sockets alive and detect connection problems.
   socketTimeoutMS: 45000,
   heartbeatFrequencyMS: 10000,
 };
 
-// CORS configuration.
 app.use(
   cors({
     origin(origin, callback) {
@@ -67,7 +61,6 @@ app.use(
 
 app.use(express.json({ limit: '25mb' }));
 
-// Health check.
 app.get('/api/health', (_req, res) => {
   const connected = mongoose.connection.readyState === 1;
 
@@ -78,24 +71,19 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
-// Database-dependent routes are mounted below.
-// The server starts listening only after initial DB setup succeeds.
 app.use('/api/auth', authRoutes);
 app.use('/api/equipment', equipmentRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/admin', adminRoutes);
 
-// Return JSON for unknown API endpoints.
 app.use('/api', (_req, res) => {
   res.status(404).json({
     message: 'API endpoint not found',
   });
 });
 
-// Serve static React frontend assets.
 app.use(express.static(clientDistPath));
 
-// React SPA fallback.
 app.get(/.*/, (req, res, next) => {
   if (req.path.startsWith('/api/')) {
     return res.status(404).json({
@@ -111,7 +99,6 @@ app.get(/.*/, (req, res, next) => {
   );
 });
 
-// Preserve user index configuration.
 async function ensureUserIndexes() {
   const indexes = await User.collection.indexes();
 
@@ -121,12 +108,10 @@ async function ensureUserIndexes() {
       index.key.mobileNumber === 1
   );
 
-  // Remove the old unique mobile index if present.
   if (mobileIndex?.unique) {
     await User.collection.dropIndex(mobileIndex.name);
   }
 
-  // Create the non-unique sparse mobile index if needed.
   if (!mobileIndex || mobileIndex.unique) {
     await User.collection.createIndex(
       { mobileNumber: 1 },
@@ -137,7 +122,6 @@ async function ensureUserIndexes() {
     );
   }
 
-  // Keep email unique.
   await User.collection.createIndex(
     { email: 1 },
     {
@@ -147,7 +131,6 @@ async function ensureUserIndexes() {
   );
 }
 
-// Connect immediately, retry only if connection fails.
 async function connectToDatabase() {
   if (!env.mongoUri) {
     throw new Error('MONGO_URI is missing from environment variables.');
@@ -165,12 +148,10 @@ async function connectToDatabase() {
         `Connecting to MongoDB Atlas (attempt ${attempt})...`
       );
 
-      // Start the connection immediately; no initial sleep.
       await mongoose.connect(env.mongoUri, MONGO_OPTIONS);
 
       console.log('MongoDB connected successfully.');
 
-      // Do not report startup success until indexes are ready.
       await ensureUserIndexes();
 
       console.log('MongoDB indexes verified successfully.');

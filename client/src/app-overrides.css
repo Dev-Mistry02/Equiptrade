@@ -5372,14 +5372,23 @@ body {
   min-height: 100vh;
   align-items: center;
   justify-content: center;
-  gap: 12px;
   background: var(--warm);
-  color: var(--ink);
-  font: 600 15px 'Space Grotesk';
 }
 
-.session-loader .action-spinner {
-  color: var(--blue);
+.session-loader .brand-logo-cog {
+  animation: gear-loader-spin 2.4s linear infinite;
+}
+
+@keyframes gear-loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .session-loader .brand-logo-cog {
+    animation: none;
+  }
 }
 
 @media (max-width: 600px) {

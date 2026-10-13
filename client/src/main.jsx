@@ -37,7 +37,7 @@ import { toggleSavedListing } from './savedListings'
 import { categories, equipment } from './data'
 import { toProductSlug } from './productSlug'
 import Footer from './components/Footer'
-import BrandLogo from './components/BrandLogo'
+import BrandLogo, { BrandLogoMark } from './components/BrandLogo'
 import './desktop.css'
 import './app-overrides.css'
 
@@ -53,9 +53,19 @@ const ProductDetailPage = lazy(() => import('./pages/ProductDetail'))
 
 function PageLoading() {
   return (
-    <main className="session-loader" role="status" aria-live="polite">
-      <LoaderCircle className="action-spinner" size={34} />
-      <span>Loading EquipTrade...</span>
+    <GearLoader />
+  )
+}
+
+function GearLoader() {
+  return (
+    <main
+      className="session-loader"
+      role="status"
+      aria-label="Loading"
+      aria-live="polite"
+    >
+      <BrandLogoMark />
     </main>
   )
 }
@@ -856,10 +866,7 @@ function App() {
   if (!sessionInitialized && (requiresSession || verificationOpen)) {
     return (
       <>
-        <main className="session-loader" role="status" aria-live="polite">
-          <LoaderCircle className="action-spinner" size={34} />
-          <span>Loading EquipTrade...</span>
-        </main>
+        <GearLoader />
         {!cookieConsentAccepted && (
           <CookieNotice onAccept={acceptCookies} />
         )}
