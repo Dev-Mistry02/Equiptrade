@@ -1,4 +1,3 @@
-
 import express from 'express';
 import cors from 'cors';
 import mongoose from 'mongoose';
@@ -22,6 +21,24 @@ const clientDistPath = path.resolve(
   __dirname,
   '../../client/dist'
 );
+
+// MongoDB connection configuration.
+const MONGO_OPTIONS = {
+  // Prefer IPv4 for compatibility with many networks.
+  family: 4,
+
+  // Fail faster when Atlas cannot be reached.
+  serverSelectionTimeoutMS: 10000,
+  connectTimeoutMS: 10000,
+
+  // Connection pool.
+  maxPoolSize: 10,
+  minPoolSize: 0,
+
+  // Keep sockets alive and detect connection problems.
+  socketTimeoutMS: 45000,
+  heartbeatFrequencyMS: 10000,
+};
 
 // CORS configuration.
 app.use(
@@ -61,13 +78,8 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
-// Block database-dependent API requests if MongoDB is disconnected.
-app.use('/api', (req, res, next) => {
-  // Let unknown API endpoints reach the 404 handler below.
-  next();
-});
-
-// Authentication, equipment, feedback, and admin routes.
+// Database-dependent routes are mounted below.
+// The server starts listening only after initial DB setup succeeds.
 app.use('/api/auth', authRoutes);
 app.use('/api/equipment', equipmentRoutes);
 app.use('/api/feedback', feedbackRoutes);
@@ -83,7 +95,7 @@ app.use('/api', (_req, res) => {
 // Serve static React frontend assets.
 app.use(express.static(clientDistPath));
 
-// React SPA fallback for routes such as /verification and /home.
+// React SPA fallback.
 app.get(/.*/, (req, res, next) => {
   if (req.path.startsWith('/api/')) {
     return res.status(404).json({
@@ -109,10 +121,12 @@ async function ensureUserIndexes() {
       index.key.mobileNumber === 1
   );
 
+  // Remove the old unique mobile index if present.
   if (mobileIndex?.unique) {
     await User.collection.dropIndex(mobileIndex.name);
   }
 
+  // Create the non-unique sparse mobile index if needed.
   if (!mobileIndex || mobileIndex.unique) {
     await User.collection.createIndex(
       { mobileNumber: 1 },
@@ -123,6 +137,7 @@ async function ensureUserIndexes() {
     );
   }
 
+  // Keep email unique.
   await User.collection.createIndex(
     { email: 1 },
     {
@@ -132,61 +147,75 @@ async function ensureUserIndexes() {
   );
 }
 
-// Connect to MongoDB with retry logic.
+// Connect immediately, retry only if connection fails.
 async function connectToDatabase() {
   if (!env.mongoUri) {
-    throw new Error('MONGO_URI is missing from .env');
+    throw new Error('MONGO_URI is missing from environment variables.');
   }
 
   let attempt = 0;
+  let delayMs = 2000;
+  const maxDelayMs = 15000;
 
   while (true) {
+    attempt++;
+
     try {
-      attempt++;
+      console.log(
+        `Connecting to MongoDB Atlas (attempt ${attempt})...`
+      );
 
-      console.log(`Connecting to MongoDB (attempt ${attempt})...`);
-
-      await mongoose.connect(env.mongoUri, {
-        serverSelectionTimeoutMS: 15000,
-        connectTimeoutMS: 15000,
-        maxPoolSize: 10,
-        family: 4,
-      });
-
-      await ensureUserIndexes();
+      // Start the connection immediately; no initial sleep.
+      await mongoose.connect(env.mongoUri, MONGO_OPTIONS);
 
       console.log('MongoDB connected successfully.');
+
+      // Do not report startup success until indexes are ready.
+      await ensureUserIndexes();
+
+      console.log('MongoDB indexes verified successfully.');
+
       return;
     } catch (error) {
       console.error(
-        `MongoDB attempt ${attempt} failed:`,
-        error.message
+        `MongoDB attempt ${attempt} failed: ${error.message}`
       );
 
-      await mongoose.disconnect().catch(() => {});
+      // Clean up a failed connection before retrying.
+      try {
+        await mongoose.disconnect();
+      } catch {
+        // Preserve the original connection error.
+      }
 
-      const wait = Math.min(
-        2000 * 2 ** (attempt - 1),
-        30000
+      console.error(
+        `MongoDB connection failed. Retrying in ${
+          delayMs / 1000
+        } seconds...`
       );
 
-      console.log(`Retrying in ${wait / 1000} seconds...`);
+      await new Promise(resolve => setTimeout(resolve, delayMs));
 
-      await new Promise(resolve => setTimeout(resolve, wait));
+      // Exponential backoff with a maximum delay.
+      delayMs = Math.min(delayMs * 2, maxDelayMs);
     }
   }
 }
 
 // MongoDB connection events.
+mongoose.connection.on('connected', () => {
+  console.log('MongoDB connection established.');
+});
+
 mongoose.connection.on('disconnected', () => {
-  console.error('MongoDB disconnected.');
+  console.warn('MongoDB connection lost.');
 });
 
 mongoose.connection.on('error', error => {
   console.error('MongoDB error:', error.message);
 });
 
-// Start the server.
+// Start the server only after successful DB initialization.
 async function startServer() {
   try {
     validateSecuritySecrets();

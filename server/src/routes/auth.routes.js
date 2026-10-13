@@ -135,6 +135,12 @@ router.post('/send-otp', async (req, res) => {
     ).trim()
     const email = normalizeEmail(req.body.email)
 
+    if (!/^[6-9]\d{9}$/.test(mobileNumber)) {
+      return res.status(400).json({
+        message: 'Enter a valid 10-digit Indian mobile number.',
+      })
+    }
+
     if (!email || !isValidEmail(email)) {
       return res.status(400).json({
         message: 'Enter a valid email address.',

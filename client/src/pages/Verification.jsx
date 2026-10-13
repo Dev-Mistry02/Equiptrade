@@ -86,10 +86,14 @@ export default function Verification({
                     required
                     type="tel"
                     autoComplete="tel"
-                    inputMode="tel"
+                    inputMode="numeric"
                     value={data.mobileNumber}
                     onChange={event => setData(current => ({ ...current, mobileNumber: event.target.value }))}
                     placeholder="Your mobile number"
+                    minLength={10}
+                    maxLength={10}
+                    pattern="[6-9][0-9]{9}"
+                    title="Enter a valid 10-digit Indian mobile number starting with 6-9."
                   />
                 </label>
 

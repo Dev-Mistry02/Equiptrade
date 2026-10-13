@@ -260,14 +260,14 @@ function App() {
   }, [theme])
 
   useEffect(() => {
-    const legacyAuthKeys = [
+    const legacyStorageKeys = [
       'equiptrade_user_token',
       'equiptrade_user_expires_at',
       'equiptrade_user',
       'equiptrade_admin_token',
       'equiptrade_admin_expires_at',
     ]
-    legacyAuthKeys.forEach(key => localStorage.removeItem(key))
+    legacyStorageKeys.forEach(key => localStorage.removeItem(key))
 
     let active = true
     let latestSessionRequest = 0

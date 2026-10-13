@@ -7916,6 +7916,19 @@ body {
     padding-bottom: 46px;
   }
 
+  .sell-page .product-review-media {
+    height: 220px;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .sell-page .product-review-media > img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
   .sell-page .page-heading {
     flex-direction: column;
     align-items: stretch;
@@ -9597,4 +9610,69 @@ html[data-theme='dark'] .verification-card input {
 html[data-theme='dark'] .verification-card input:focus {
   border-color: #79c5d0;
   box-shadow: 0 0 0 3px rgba(121, 197, 208, .15);
+}
+
+html[data-theme='dark'] .verification-card .full-button {
+  color: #102a30;
+  background-color: #79c5d0;
+}
+
+html[data-theme='dark'] .verification-card .full-button:hover:not(:disabled) {
+  color: #102a30;
+  background-color: #9ad5dd;
+}
+
+html[data-theme='dark'] .verification-card .full-button:disabled {
+  color: #102a30;
+  background-color: #557f86;
+}
+
+@media (min-width: 701px) {
+  .admin-table-wrap {
+    overflow-x: auto;
+  }
+
+  .admin-table-wrap table {
+    width: max-content;
+    min-width: 100%;
+  }
+}
+
+html[data-theme='dark'] .admin-shell .metric {
+  color: var(--ink);
+  background-color: #19252d;
+  border-color: var(--line);
+}
+
+html[data-theme='dark'] .admin-shell .metric span {
+  color: var(--muted);
+}
+
+html[data-theme='dark'] .admin-shell .metric strong,
+html[data-theme='dark'] .admin-shell .admin-table-wrap .table-head h2,
+html[data-theme='dark'] .admin-shell .admin-table-wrap .empty-state {
+  color: var(--ink);
+}
+
+html[data-theme='dark'] .admin-shell .metric small {
+  color: #80c6a7;
+}
+
+html[data-theme='dark'] .admin-shell .metric small.warn-text {
+  color: var(--amber);
+}
+
+html[data-theme='dark'] .admin-shell .admin-table-wrap {
+  color: var(--ink);
+  background-color: #19252d;
+  border-color: var(--line);
+}
+
+html[data-theme='dark'] .admin-shell .admin-table-wrap th {
+  color: var(--muted);
+  background-color: #142127;
+}
+
+html[data-theme='dark'] .admin-shell .admin-table-wrap td {
+  color: var(--ink);
 }
