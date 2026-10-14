@@ -3730,6 +3730,14 @@ body {
   padding: 18px 0;
 }
 
+.home-page .home-category-loader {
+  display: flex;
+  min-height: 120px;
+  align-items: center;
+  justify-content: center;
+  color: #a7752a;
+}
+
 .home-page .process-section {
   padding-top: 84px;
   padding-bottom: 94px;

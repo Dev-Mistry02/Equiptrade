@@ -1,4 +1,4 @@
-import { ArrowRight, BadgeCheck, Building2, Check, ChevronLeft, ChevronRight, ClipboardCheck, Handshake, Pause, Play, Search, ShieldCheck, Sparkles, Truck, Upload, Zap } from 'lucide-react'
+import { ArrowRight, BadgeCheck, Building2, Check, ChevronLeft, ChevronRight, ClipboardCheck, Handshake, LoaderCircle, Pause, Play, Search, ShieldCheck, Sparkles, Truck, Upload, Zap } from 'lucide-react'
 import { memo, useCallback, useEffect, useState } from 'react'
 import { api } from '../api'
 import { EquipmentCard, Process, SectionHeading } from '../components/MarketplaceComponents'
@@ -209,7 +209,7 @@ export default function Home({ navigate, setSelected, onSaveListing, search, set
       <section className="section container home-categories">
         <SectionHeading eyebrow="The right tool for the job" title="Explore equipment" link="All equipment" onClick={() => navigate('browse')} />
         <p className="home-section-intro">Browse popular categories and get straight to the machines your work needs.</p>
-        {loading ? <p className="home-state">Loading categories...</p> : error ? <div className="home-state"><p className="data-error">{error}</p><button className="button button-dark" onClick={loadEquipment}>Try again</button></div> : categoryNames.length ? <div className="category-grid">{categoryNames.map((category, index) => <button className="category-card" key={category.name} onClick={() => { setSearch(category.name); navigate('browse') }}><span className={`category-icon ${['blue', 'amber', 'green', 'rose'][index % 4]}`}>⚙</span><span className="category-name">{category.name}</span><span className="category-count">{category.count} listings <ArrowRight size={14} /></span></button>)}</div> : <p className="home-state">No published categories yet.</p>}
+        {loading ? <div className="home-category-loader" role="status" aria-label="Loading categories"><LoaderCircle className="action-spinner" size={28} /></div> : error ? <div className="home-state"><p className="data-error">{error}</p><button className="button button-dark" onClick={loadEquipment}>Try again</button></div> : categoryNames.length ? <div className="category-grid">{categoryNames.map((category, index) => <button className="category-card" key={category.name} onClick={() => { setSearch(category.name); navigate('browse') }}><span className={`category-icon ${['blue', 'amber', 'green', 'rose'][index % 4]}`}>⚙</span><span className="category-name">{category.name}</span><span className="category-count">{category.count} listings <ArrowRight size={14} /></span></button>)}</div> : <p className="home-state">No published categories yet.</p>}
       </section>
 
       <section className="section section-muted home-featured">
