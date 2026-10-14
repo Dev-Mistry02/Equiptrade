@@ -1,10 +1,41 @@
-import { ArrowRight, BadgeCheck, Building2, Check, ClipboardCheck, Handshake, Search, ShieldCheck, Sparkles, Truck, Upload, Zap } from 'lucide-react'
+import { ArrowRight, BadgeCheck, Building2, Check, ChevronLeft, ChevronRight, ClipboardCheck, Handshake, Pause, Play, Search, ShieldCheck, Sparkles, Truck, Upload, Zap } from 'lucide-react'
 import { memo, useCallback, useEffect, useState } from 'react'
 import { api } from '../api'
 import { EquipmentCard, Process, SectionHeading } from '../components/MarketplaceComponents'
+import { equipment as featuredEquipment } from '../data'
 import { getCachedListings, setCachedListings } from '../marketplaceCache'
 
-const HomeSearch = memo(function HomeSearch({ initialSearch, navigate, setSearch }) {
+const homeSlides = [
+  {
+    eyebrow: "India's verified equipment network",
+    title: ['Monetize Your', 'Idle Assets & Surplus', 'Industrial Goods'],
+    description: 'Find dependable machinery from verified Indian sellers—or put your idle equipment to work.',
+    image: '/equipment.png',
+    imageAlt: 'Wheel loader ready for work at sunset',
+    imageNote: 'Machines for real work.',
+    searchPlaceholder: 'Try “excavator” or “CNC machine”',
+  },
+  {
+    eyebrow: 'Find the right machine for the job',
+    title: ['Discover', 'Verified Equipment', 'Across India'],
+    description: 'Explore reviewed machinery from trusted sellers and find the right fit for your next project.',
+    image: featuredEquipment[0].image,
+    imageAlt: 'Industrial machinery available from verified sellers',
+    imageNote: 'The right machine. Ready.',
+    searchPlaceholder: 'Try “CNC machine” or “lathe”',
+  },
+  {
+    eyebrow: 'Give good equipment a new job',
+    title: ['Turn Idle', 'Equipment Into', 'Opportunity'],
+    description: 'Reach serious buyers, answer enquiries directly, and get more value from machinery you no longer need.',
+    image: featuredEquipment[2].image,
+    imageAlt: 'Material handling equipment for Indian businesses',
+    imageNote: 'Better use for every asset.',
+    searchPlaceholder: 'Try “forklift” or “generator”',
+  },
+]
+
+const HomeSearch = memo(function HomeSearch({ initialSearch, navigate, placeholder, setSearch }) {
   const [query, setQuery] = useState(initialSearch)
 
   const submitSearch = event => {
@@ -19,7 +50,7 @@ const HomeSearch = memo(function HomeSearch({ initialSearch, navigate, setSearch
       <input
         value={query}
         onChange={event => setQuery(event.target.value)}
-        placeholder="Try “excavator” or “CNC machine”"
+        placeholder={placeholder}
         aria-label="Search equipment"
       />
       <button type="submit">Find equipment <ArrowRight size={16} /></button>
@@ -28,8 +59,9 @@ const HomeSearch = memo(function HomeSearch({ initialSearch, navigate, setSearch
 })
 
 export default function Home({ navigate, setSelected, onSaveListing, search, setSearch }) {
-  const [showHeroVisual, setShowHeroVisual] = useState(
-    () => window.matchMedia('(min-width: 851px)').matches
+  const [activeSlide, setActiveSlide] = useState(0)
+  const [isAutoPlaying, setIsAutoPlaying] = useState(
+    () => !window.matchMedia('(prefers-reduced-motion: reduce)').matches
   )
   const cachedHomeData = getCachedListings('home')
   const [homeData, setHomeData] = useState(() => cachedHomeData || {
@@ -64,26 +96,37 @@ export default function Home({ navigate, setSelected, onSaveListing, search, set
   }, [loadEquipment])
 
   useEffect(() => {
-    const updateHeroVisibility = () =>
-      setShowHeroVisual(window.innerWidth > 850)
-    window.addEventListener('resize', updateHeroVisibility, { passive: true })
-    return () => window.removeEventListener('resize', updateHeroVisibility)
-  }, [])
+    if (!isAutoPlaying) return undefined
+
+    const interval = window.setInterval(() => {
+      setActiveSlide(current => (current + 1) % homeSlides.length)
+    }, 4000)
+
+    return () => window.clearInterval(interval)
+  }, [isAutoPlaying])
 
   const equipment = homeData.listings
   const categoryNames = homeData.categories
+  const slide = homeSlides[activeSlide]
+  const selectSlide = index => setActiveSlide((index + homeSlides.length) % homeSlides.length)
   return (
     <main className="home-page">
-      <section className="home-hero">
+      <section
+        className="home-hero"
+        style={{ '--mobile-hero-image': `url("${slide.image}")` }}
+        aria-label="Featured equipment"
+        aria-roledescription="carousel"
+      >
         <span className="hero-gear" aria-hidden="true">⚙</span>
         <div className="hero container">
           <div className="hero-copy">
-            <div className="eyebrow"><span className="pulse-dot" /> India's verified equipment network</div>
-            <h1>Monetize Your<br /><em>Idle Assets &amp; Surplus</em><br />Industrial Goods</h1>
-            <p>Find dependable machinery from verified Indian sellers—or put your idle equipment to work.</p>
+            <div className="eyebrow"><span className="pulse-dot" /> {slide.eyebrow}</div>
+            <h1 key={`title-${activeSlide}`}>{slide.title[0]}<br /><em>{slide.title[1]}</em><br />{slide.title[2]}</h1>
+            <p key={`description-${activeSlide}`}>{slide.description}</p>
             <HomeSearch
               initialSearch={search}
               navigate={navigate}
+              placeholder={slide.searchPlaceholder}
               setSearch={setSearch}
             />
             <div className="hero-trust">
@@ -91,19 +134,43 @@ export default function Home({ navigate, setSelected, onSaveListing, search, set
               <span><Zap size={16} /> Direct enquiries</span>
               <span><Building2 size={16} /> Across India</span>
             </div>
+            <div className="hero-carousel-controls" role="group" aria-label="Hero carousel controls">
+              <button type="button" className="hero-carousel-arrow" onClick={() => selectSlide(activeSlide - 1)} aria-label="Previous slide">
+                <ChevronLeft size={18} />
+              </button>
+              <div className="hero-carousel-pagination" role="group" aria-label="Choose a slide">
+                {homeSlides.map((item, index) => (
+                  <button
+                    type="button"
+                    key={item.eyebrow}
+                    className={`hero-carousel-dot${activeSlide === index ? ' is-active' : ''}`}
+                    onClick={() => selectSlide(index)}
+                    aria-label={`Show slide ${index + 1}: ${item.eyebrow}`}
+                    aria-current={activeSlide === index ? 'true' : undefined}
+                  />
+                ))}
+              </div>
+              <span className="hero-carousel-count"><strong>0{activeSlide + 1}</strong> / 0{homeSlides.length}</span>
+              <button
+                type="button"
+                className="hero-carousel-arrow hero-carousel-play"
+                onClick={() => setIsAutoPlaying(current => !current)}
+                aria-label={isAutoPlaying ? 'Pause automatic slides' : 'Play automatic slides'}
+              >
+                {isAutoPlaying ? <Pause size={15} /> : <Play size={15} />}
+              </button>
+              <button type="button" className="hero-carousel-arrow" onClick={() => selectSlide(activeSlide + 1)} aria-label="Next slide">
+                <ChevronRight size={18} />
+              </button>
+            </div>
           </div>
-          {showHeroVisual && <div className="hero-visual">
+          <div className="hero-visual" key={`visual-${activeSlide}`}>
             <div className="hero-image">
               <picture>
                 <img
-                  src="/equipment.png"
-                  // srcSet={[
-                  //   'https://images.unsplash.com/photo-1565793298595-6a879b1d9492?auto=format&fit=crop&w=640&q=68 640w',
-                  //   'https://images.unsplash.com/photo-1565793298595-6a879b1d9492?auto=format&fit=crop&w=900&q=70 900w',
-                  //   'https://images.unsplash.com/photo-1565793298595-6a879b1d9492?auto=format&fit=crop&w=1200&q=72 1200w',
-                  // ].join(', ')}
+                  src={slide.image}
                   sizes="(max-width: 1100px) 45vw, 540px"
-                  alt="Industrial machinery in a modern workshop"
+                  alt={slide.imageAlt}
                   width="900"
                   height="620"
                   fetchPriority="high"
@@ -113,8 +180,8 @@ export default function Home({ navigate, setSelected, onSaveListing, search, set
               <div className="image-label"><span className="status-dot" /> The equipment marketplace <strong>{homeData.totalListings}</strong> listings</div>
             </div>
             <div className="floating-stat"><span className="stat-icon"><BadgeCheck size={20} /></span><div><strong>Verified</strong><small>Every listing reviewed</small></div></div>
-            <div className="hero-image-note"><span>01</span><span>Machines for real work.</span></div>
-          </div>}
+            <div className="hero-image-note"><span>0{activeSlide + 1}</span><span>{slide.imageNote}</span></div>
+          </div>
         </div>
       </section>
 
@@ -128,7 +195,7 @@ export default function Home({ navigate, setSelected, onSaveListing, search, set
         <div className="container choice-grid">
           <button className="choice-card buy" onClick={() => navigate('browse')}>
             <div className="choice-icon"><Search size={23} /></div>
-            <div><span className="card-kicker">For buyers</span><h2>Find your Equipment.</h2><p>Compare verified equipment from trusted sellers across India.</p><span className="text-link">Explore equipment <ArrowRight size={16} /></span></div>
+            <div><span className="card-kicker">For buyers</span><h2>Find your Equipment.</h2><p>Compare verified equipment from trusted sellers.</p><span className="text-link">Explore equipment <ArrowRight size={16} /></span></div>
             <span className="choice-decoration" aria-hidden="true">01</span>
           </button>
           <button className="choice-card sell" onClick={() => navigate('sell')}>
