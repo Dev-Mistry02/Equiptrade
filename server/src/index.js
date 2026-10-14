@@ -42,6 +42,7 @@ app.use(
         env.clientUrl,
         'https://equiptradeindia.onrender.com',
         'http://localhost:5173',
+        'https://www.equiptradeindia.com',
       ].filter(Boolean);
 
       const isLocal =
