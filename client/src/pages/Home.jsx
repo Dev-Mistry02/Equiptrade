@@ -216,7 +216,7 @@ export default function Home({ navigate, setSelected, onSaveListing, search, set
         <div className="container">
           <SectionHeading eyebrow="Inspected. Approved. Ready." title="Recently verified" />
           <p className="home-section-intro">A closer look at equipment that has passed our review.</p>
-          {loading ? <p className="home-state">Loading listings...</p> : error ? <div className="home-state"><p className="data-error">{error}</p><button className="button button-dark" onClick={loadEquipment}>Try again</button></div> : equipment.length ? <>
+          {loading ? <div className="home-category-loader" role="status" aria-label="Loading verified equipment"><LoaderCircle className="action-spinner" size={28} /></div> : error ? <div className="home-state"><p className="data-error">{error}</p><button className="button button-dark" onClick={loadEquipment}>Try again</button></div> : equipment.length ? <>
             <div className="listing-grid home-featured-grid">{equipment.slice(0, 4).map(item => <EquipmentCard item={item} key={item._id} onClick={() => setSelected(item)} onSave={onSaveListing} imageSizes="(max-width: 700px) 45vw, (max-width: 1099px) 33vw, 25vw" />)}</div>
             <button className="home-browse-all-button" onClick={() => navigate('browse')}>Browse all equipment <ArrowRight size={17} /></button>
           </> : <p className="home-state">No approved equipment yet.</p>}
