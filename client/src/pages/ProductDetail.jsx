@@ -343,13 +343,7 @@ export default function ProductDetail({
 
   const openEnquiry = () => {
     setEnquiryError('')
-
-    if (user) {
-      setEnquiryModal(true)
-      return
-    }
-
-    requireVerification?.(() => setEnquiryModal(true))
+    setEnquiryModal(true)
   }
 
   const sendEnquiry = async () => {
@@ -386,7 +380,11 @@ export default function ProductDetail({
     event.preventDefault()
 
     if (!user) {
-      setEnquiryError('Sign in to send an enquiry to this seller.')
+      if (requireVerification) {
+        requireVerification(sendEnquiry)
+      } else {
+        setEnquiryError('Verify your account before sending an enquiry.')
+      }
       return
     }
 
@@ -1046,8 +1044,8 @@ export default function ProductDetail({
                 </label>
               ) : (
                 <p className="pd-enquiry-signin-note">
-                  Sign in is only needed when you send your enquiry. Your message
-                  will stay ready while you verify your email.
+                  Verify your account before sending. Your message will stay
+                  ready while you verify your email.
                 </p>
               )}
 

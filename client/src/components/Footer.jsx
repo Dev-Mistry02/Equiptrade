@@ -6,7 +6,7 @@ export default function Footer({ navigate, notify }) {
     <div className="container footer-grid">
       <div className="footer-intro">
         <button className="brand footer-brand" onClick={() => navigate('home')} aria-label="EquipTrade India home"><BrandLogo /></button>
-        <p>India's trusted marketplace for verified industrial equipment, machinery and business vehicles.</p>
+        <p>India's marketplace for industrial equipment, surplus spares, machinery and business vehicles.</p>
         <span className="footer-trust"><ShieldCheck size={15} /> Human-reviewed listings</span>
       </div>
       <div className="footer-links">

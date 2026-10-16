@@ -2,12 +2,16 @@ import { ArrowLeft, FileText, ShieldCheck } from 'lucide-react'
 
 const legalSections = [
   {
-    title: 'Marketplace role',
-    text: 'EquipTrade provides a platform for businesses to discover equipment and contact sellers. Unless expressly stated otherwise, a purchase or sale is arranged directly between the buyer and seller.',
+    title: 'Marketplace role & Limitation of Liability',
+    text: 'EquipTrade India operates solely as an intermediary and machinery listing platform, connecting buyers and sellers. The platform does not independently verify ownership documents, machinery condition, fitness, operating hours, outstanding liabilities, or other claims made by sellers. Buyers are responsible for conducting their own due diligence, verifying ownership and relevant documents, and physically inspecting machinery before making any payment or entering into a transaction. EquipTrade India does not guarantee the accuracy, completeness, quality, ownership, or condition of any listed machinery.',
   },
   {
     title: 'Listing review',
     text: 'A listing marked as reviewed has passed the platform’s submission review. This is not an independent inspection, certification, warranty, or guarantee of the equipment’s condition, ownership, or suitability.',
+  },
+  {
+    title: 'Payment & Commercial Transactions',
+    text: 'EquipTrade India does not collect advance payments, provide escrow services, or guarantee the safety of token payments. All payments, GST invoices, and logistics agreements are handled directly between the buyer and seller. Both parties are responsible for verifying payment terms and completing transactions securely.',
   },
   {
     title: 'Information and enquiries',

@@ -32,7 +32,13 @@ const CATEGORY_OPTIONS = [
   'Agricultural Equipment',
   'Material Handling Equipment',
   'Industrial Equipment',
+  'DG Sets & Generators',
+  'Transformers',
+  'Heavy Industrial Motors',
   'Electrical Equipment',
+  'MRO Spare Parts',
+  'Surplus Industrial Machinery',
+  'Business Vehicles',
   'Welding Equipment',
   'Compressors',
   'Generators',
@@ -566,7 +572,11 @@ export default function Sell({
             <ShieldCheck size={17} />
             <span>
               <strong>Reviewed by our team</strong>
-              <small>Your listing stays private until it is approved.</small>
+              <small>
+                {user
+                  ? 'Your listing stays private until it is approved.'
+                  : 'Prepare your listing now; sign in and verify before submitting.'}
+              </small>
             </span>
           </div>
         </div>
@@ -805,7 +815,7 @@ export default function Sell({
             <>
               <FormIntro
                 title="Add context buyers can trust"
-                text="Clear details and real images create confident enquiries. Upload 3 to 4 different images of your equipment."
+                text="Add details and photos to prepare your listing. Sign in and verify before submitting; photos are uploaded only after verification."
               />
 
               <label className="full-field">
@@ -1094,7 +1104,9 @@ export default function Sell({
               disabled={submitting}
             >
               {step === 3
-                ? 'Submit for verification'
+                ? user
+                  ? 'Submit for review'
+                  : 'Sign in & verify to submit'
                 : 'Continue'}
 
               <ArrowRight size={17} />

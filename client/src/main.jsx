@@ -110,6 +110,9 @@ function getPageFromPath(pathname = window.location.pathname) {
 function isPublicPath(pathname) {
   return (
     pathname === '/' ||
+    pathname === '/buy' ||
+    pathname.startsWith('/buy/') ||
+    pathname === '/sell' ||
     [
       '/home',
       '/about',
@@ -335,7 +338,7 @@ function App() {
     if (verified) {
       const action = pendingAction
       setPendingAction(null)
-      action()
+      action(user)
       return
     }
 
@@ -343,7 +346,7 @@ function App() {
       window.history.pushState({}, '', pageToPath.verification)
       setVerificationOpen(true)
     }
-  }, [sessionInitialized, verified, pendingAction, verificationOpen])
+  }, [sessionInitialized, verified, user, pendingAction, verificationOpen])
 
   useEffect(() => {
     if (!verified && authData.email) {
@@ -764,20 +767,6 @@ function App() {
     })
   }
 
-  const guardedNavigate = (nextPage, options = {}) => {
-    const requiresVerification =
-      nextPage === 'browse' ||
-      nextPage === 'sell' ||
-      nextPage === 'product-detail'
-
-    if (requiresVerification && !verified) {
-      requireVerification(() => navigate(nextPage, options))
-      return
-    }
-
-    navigate(nextPage, options)
-  }
-
   const requireVerification = action => {
     const authenticated = verified
 
@@ -827,41 +816,9 @@ function App() {
     requireVerification(save)
   }
 
-  useEffect(() => {
-    const protectedPage =
-      page === 'browse' ||
-      page === 'sell' ||
-      page === 'product-detail'
-
-    if (!sessionInitialized || verified || !protectedPage) return
-
-    const requestedPage = page
-    const requestedOptions =
-      page === 'product-detail'
-        ? { product: selectedProduct, slug: productSlug }
-        : {}
-
-    setPendingAction(
-      () => () => navigate(requestedPage, requestedOptions)
-    )
-    setPage('home')
-    window.history.replaceState({}, '', pageToPath.verification)
-    setVerificationOpen(true)
-  }, [
-    page,
-    productSlug,
-    selectedProduct,
-    sessionInitialized,
-    verified,
-    navigate,
-  ])
-
   const requiresSession =
     page === 'admin' ||
-    page === 'verification' ||
-    page === 'browse' ||
-    page === 'sell' ||
-    page === 'product-detail'
+    page === 'verification'
 
   if (!sessionInitialized && (requiresSession || verificationOpen)) {
     return (
@@ -974,7 +931,7 @@ function App() {
                 ? 'nav-link active'
                 : 'nav-link'
             }
-            onClick={() => guardedNavigate('browse')}
+            onClick={() => navigate('browse')}
           >
             Buy
           </button>
@@ -985,7 +942,7 @@ function App() {
                 ? 'nav-link active'
                 : 'nav-link'
             }
-            onClick={() => guardedNavigate('sell')}
+            onClick={() => navigate('sell')}
           >
             Sell
           </button>
@@ -1096,7 +1053,7 @@ function App() {
 
       <MobileDock
         page={page}
-        navigate={guardedNavigate}
+        navigate={navigate}
         onProfile={handleProfileClick}
         profileOpen={profileOpen}
       />
@@ -1162,18 +1119,18 @@ function App() {
       <Suspense fallback={<PageLoading />}>
         {page === 'home' && (
           <HomePage
-            navigate={guardedNavigate}
+            navigate={navigate}
             onSaveListing={handleSaveListing}
             setSelected={item => {
               const slug = toProductSlug(item?.name) || item?._id
-              guardedNavigate('product-detail', { product: item, slug })
+              navigate('product-detail', { product: item, slug })
             }}
             search={search}
             setSearch={setSearch}
           />
         )}
 
-        {page === 'about' && <AboutPage navigate={guardedNavigate} />}
+        {page === 'about' && <AboutPage navigate={navigate} />}
 
         {page === 'legal-info' && <LegalInfoPage navigate={navigate} />}
 
@@ -1186,9 +1143,9 @@ function App() {
             onSaveListing={handleSaveListing}
             setSelected={item => {
               const slug = toProductSlug(item?.name) || item?._id
-              guardedNavigate('product-detail', { product: item, slug })
+              navigate('product-detail', { product: item, slug })
             }}
-            navigate={guardedNavigate}
+            navigate={navigate}
           />
         )}
 
@@ -1196,7 +1153,7 @@ function App() {
           <ProductDetailPage
             slug={productSlug}
             product={selectedProduct}
-            navigate={guardedNavigate}
+            navigate={navigate}
             notify={notify}
             requireVerification={requireVerification}
             user={user}
@@ -1206,7 +1163,7 @@ function App() {
         {page === 'sell' && (
           <SellPage
             notify={notify}
-            navigate={guardedNavigate}
+            navigate={navigate}
             user={user}
             requireVerification={requireVerification}
           />
@@ -1222,7 +1179,7 @@ function App() {
       </Suspense>
 
       <Footer
-        navigate={guardedNavigate}
+        navigate={navigate}
         notify={notify}
       />
 

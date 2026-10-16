@@ -7,31 +7,31 @@ import { getCachedListings, setCachedListings } from '../marketplaceCache'
 
 const homeSlides = [
   {
-    eyebrow: "India's verified equipment network",
-    title: ['Monetize Your', 'Idle Assets & Surplus', 'Industrial Goods'],
-    description: 'Find dependable machinery from verified Indian sellers—or put your idle equipment to work.',
+    eyebrow: "India's verified business marketplace",
+    title: ['Industrial Assets', 'Vehicles & Surplus', 'Find Their Next Use'],
+    description: 'Discover industrial machinery, electrical equipment, surplus spares, and business vehicles from verified Indian sellers.',
     image: '/equipment.png',
     imageAlt: 'Wheel loader ready for work at sunset',
     imageNote: 'Machines for real work.',
-    searchPlaceholder: 'Try “excavator” or “CNC machine”',
+    searchPlaceholder: 'Try “transformer” or “business vehicle”',
   },
   {
-    eyebrow: 'Find the right machine for the job',
-    title: ['Discover', 'Verified Equipment', 'Across India'],
-    description: 'Explore reviewed machinery from trusted sellers and find the right fit for your next project.',
+    eyebrow: 'For plant teams and industrial buyers',
+    title: ['Find Industrial', 'Equipment & Spares', 'Across India'],
+    description: 'For plant engineers, factory owners, maintenance teams, and procurement managers sourcing DG sets, transformers, heavy motors, MRO spares, and surplus machinery.',
     image: featuredEquipment[0].image,
     imageAlt: 'Industrial machinery available from verified sellers',
     imageNote: 'The right machine. Ready.',
-    searchPlaceholder: 'Try “CNC machine” or “lathe”',
+    searchPlaceholder: 'Try “DG set” or “MRO spare parts”',
   },
   {
-    eyebrow: 'Give good equipment a new job',
-    title: ['Turn Idle', 'Equipment Into', 'Opportunity'],
-    description: 'Reach serious buyers, answer enquiries directly, and get more value from machinery you no longer need.',
+    eyebrow: 'For businesses with assets to sell',
+    title: ['List Machinery,', 'Surplus & Vehicles', 'With Confidence'],
+    description: 'Reach serious industrial and business buyers, respond to enquiries directly, and put idle assets to work.',
     image: featuredEquipment[2].image,
     imageAlt: 'Material handling equipment for Indian businesses',
     imageNote: 'Better use for every asset.',
-    searchPlaceholder: 'Try “forklift” or “generator”',
+    searchPlaceholder: 'Try “forklift” or “commercial vehicle”',
   },
 ]
 
@@ -208,7 +208,7 @@ export default function Home({ navigate, setSelected, onSaveListing, search, set
 
       <section className="section container home-categories">
         <SectionHeading eyebrow="The right tool for the job" title="Explore equipment" link="All equipment" onClick={() => navigate('browse')} />
-        <p className="home-section-intro">Browse popular categories and get straight to the machines your work needs.</p>
+        <p className="home-section-intro">From DG sets, transformers, and MRO spares to industrial machinery and business vehicles, find equipment for your work.</p>
         {loading ? <div className="home-category-loader" role="status" aria-label="Loading categories"><LoaderCircle className="action-spinner" size={28} /></div> : error ? <div className="home-state"><p className="data-error">{error}</p><button className="button button-dark" onClick={loadEquipment}>Try again</button></div> : categoryNames.length ? <div className="category-grid">{categoryNames.map((category, index) => <button className="category-card" key={category.name} onClick={() => { setSearch(category.name); navigate('browse') }}><span className={`category-icon ${['blue', 'amber', 'green', 'rose'][index % 4]}`}>⚙</span><span className="category-name">{category.name}</span><span className="category-count">{category.count} listings <ArrowRight size={14} /></span></button>)}</div> : <p className="home-state">No published categories yet.</p>}
       </section>
 

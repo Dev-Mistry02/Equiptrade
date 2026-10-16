@@ -2,7 +2,14 @@ export const categories = [
   { name: 'CNC & Machine Tools', count: '124 listings', icon: '⚙', color: 'blue' },
   { name: 'Construction Equipment', count: '86 listings', icon: '▦', color: 'amber' },
   { name: 'Material Handling', count: '59 listings', icon: '↗', color: 'green' },
-  { name: 'Power & Generators', count: '42 listings', icon: '⌁', color: 'rose' }
+  { name: 'Power & Generators', count: '42 listings', icon: '⌁', color: 'rose' },
+  { name: 'DG Sets & Generators', count: '', icon: '⌁', color: 'blue' },
+  { name: 'Transformers', count: '', icon: '⚡', color: 'amber' },
+  { name: 'Heavy Industrial Motors', count: '', icon: '⚙', color: 'green' },
+  { name: 'Electrical Equipment', count: '', icon: '⚡', color: 'rose' },
+  { name: 'MRO Spare Parts', count: '', icon: '⚙', color: 'blue' },
+  { name: 'Surplus Industrial Machinery', count: '', icon: '▦', color: 'amber' },
+  { name: 'Business Vehicles', count: '', icon: '↗', color: 'green' },
 ]
 
 export const equipment = [
