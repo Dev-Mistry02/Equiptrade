@@ -72,7 +72,7 @@ export default function LegalInfo({ navigate }) {
             <span className="legal-contact-eyebrow">Need help?</span>
             <h2>Questions about using the platform ?</h2>
           </div>
-          <a href="mailto:info@equiptradeindia.com">Contact EquipTrade <ArrowLeft size={16} /></a>
+          <a href="/contact">Contact EquipTrade <ArrowLeft size={16} /></a>
         </div>
       </section>
     </main>
