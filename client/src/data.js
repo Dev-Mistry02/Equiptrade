@@ -1,16 +1,84 @@
 export const categories = [
-  { name: 'CNC & Machine Tools', count: '124 listings', icon: '⚙', color: 'blue' },
-  { name: 'Construction Equipment', count: '86 listings', icon: '▦', color: 'amber' },
-  { name: 'Material Handling', count: '59 listings', icon: '↗', color: 'green' },
-  { name: 'Power & Generators', count: '42 listings', icon: '⌁', color: 'rose' },
-  { name: 'DG Sets & Generators', count: '', icon: '⌁', color: 'blue' },
-  { name: 'Transformers', count: '', icon: '⚡', color: 'amber' },
-  { name: 'Heavy Industrial Motors', count: '', icon: '⚙', color: 'green' },
-  { name: 'Electrical Equipment', count: '', icon: '⚡', color: 'rose' },
-  { name: 'MRO Spare Parts', count: '', icon: '⚙', color: 'blue' },
-  { name: 'Surplus Industrial Machinery', count: '', icon: '▦', color: 'amber' },
-  { name: 'Business Vehicles', count: '', icon: '↗', color: 'green' },
+  {
+    name: 'DG Sets & Generators',
+    aliases: ['DG Sets & Generators', 'DG Sets', 'DG Set', 'Generators', 'Power & Generators'],
+    icon: 'Zap',
+    color: 'blue',
+  },
+  {
+    name: 'Power Transformers',
+    aliases: ['Power Transformers', 'Transformers', 'Transformer'],
+    icon: 'Activity',
+    color: 'amber',
+  },
+  {
+    name: 'Switchgear & HT Panels',
+    aliases: ['Switchgear & HT Panels', 'Switchgear', 'HT Panels', 'Electrical Equipment'],
+    icon: 'PanelTop',
+    color: 'rose',
+  },
+  {
+    name: 'Heavy Industrial Motors',
+    aliases: ['Heavy Industrial Motors', 'Industrial Motors', 'Motors'],
+    icon: 'Cog',
+    color: 'green',
+  },
+  {
+    name: 'Industrial Plant Equipment',
+    aliases: [
+      'Industrial Plant Equipment',
+      'Industrial Equipment',
+      'Plant Equipment',
+      'CNC & Machine Tools',
+      'Construction Equipment',
+      'Agricultural Equipment',
+      'Material Handling Equipment',
+      'Material Handling',
+      'Welding Equipment',
+      'Compressors',
+      'Printing Equipment',
+    ],
+    icon: 'Factory',
+    color: 'blue',
+  },
+  {
+    name: 'MRO Spares & Components',
+    aliases: ['MRO Spares & Components', 'MRO Spare Parts', 'MRO Spares', 'Spare Parts', 'Components'],
+    icon: 'Package',
+    color: 'amber',
+  },
+  {
+    name: 'Surplus / Dead Stock Equipment',
+    aliases: [
+      'Surplus / Dead Stock Equipment',
+      'Surplus Industrial Machinery',
+      'Surplus Equipment',
+      'Dead Stock Equipment',
+    ],
+    inventoryConditions: ['Surplus / Unused', 'Excess Inventory', 'Dead Stock'],
+    icon: 'Boxes',
+    color: 'rose',
+  },
 ]
+
+export const inventoryConditions = [
+  'Surplus / Unused',
+  'Excess Inventory',
+  'Dead Stock',
+  'Used Equipment',
+]
+
+export function matchesEquipmentCategory(item, category) {
+  const categoryDefinition = categories.find(({ name }) => name === category)
+  if (!categoryDefinition) return item.category === category
+
+  return (
+    categoryDefinition.aliases.some(
+      alias => alias.toLowerCase() === item.category?.toLowerCase()
+    ) ||
+    categoryDefinition.inventoryConditions?.includes(item.inventoryCondition)
+  )
+}
 
 export const equipment = [
   {

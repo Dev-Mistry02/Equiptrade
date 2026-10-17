@@ -1,19 +1,20 @@
-import { ArrowRight, BadgeCheck, Building2, Check, ChevronLeft, ChevronRight, ClipboardCheck, Handshake, LoaderCircle, Pause, Play, Search, ShieldCheck, Sparkles, Truck, Upload, Zap } from 'lucide-react'
+import { Activity, ArrowRight, BadgeCheck, Boxes, Building2, Check, ChevronLeft, ChevronRight, ClipboardCheck, Cog, Factory, Handshake, LoaderCircle, Package, PanelTop, Pause, Play, Search, ShieldCheck, Sparkles, Truck, Upload, Zap } from 'lucide-react'
 import { memo, useCallback, useEffect, useState } from 'react'
-import { api } from '../api'
+import { api, normalizeCategoryCounts } from '../api'
 import { EquipmentCard, Process, SectionHeading } from '../components/MarketplaceComponents'
 import { equipment as featuredEquipment } from '../data'
+import { isPublicQualityListing } from '../listingQuality'
 import { getCachedListings, setCachedListings } from '../marketplaceCache'
 
 const homeSlides = [
   {
-    eyebrow: "India's verified business marketplace",
-    title: ['Industrial Assets', 'Vehicles & Surplus', 'Find Their Next Use'],
-    description: 'Discover industrial machinery, electrical equipment, surplus spares, and business vehicles from verified Indian sellers.',
+    eyebrow: "India's verified industrial marketplace",
+    title: ['Your Trusted Marketplace', 'Industrial Equipment', '& Surplus Spares'],
+    description: 'Discover verified machinery, electrical equipment, plant assets, and industrial spare parts.',
     image: '/equipment.png',
     imageAlt: 'Wheel loader ready for work at sunset',
     imageNote: 'Machines for real work.',
-    searchPlaceholder: 'Try “transformer” or “business vehicle”',
+    searchPlaceholder: 'Search DG sets, transformers, OEM part numbers, and surplus spares…',
   },
   {
     eyebrow: 'For plant teams and industrial buyers',
@@ -22,16 +23,16 @@ const homeSlides = [
     image: featuredEquipment[0].image,
     imageAlt: 'Industrial machinery available from verified sellers',
     imageNote: 'The right machine. Ready.',
-    searchPlaceholder: 'Try “DG set” or “MRO spare parts”',
+    searchPlaceholder: 'Search DG sets, transformers, OEM part numbers, and surplus spares…',
   },
   {
-    eyebrow: 'For businesses with assets to sell',
-    title: ['List Machinery,', 'Surplus & Vehicles', 'With Confidence'],
-    description: 'Reach serious industrial and business buyers, respond to enquiries directly, and put idle assets to work.',
+    eyebrow: 'For plant teams and industrial buyers',
+    title: ['Source Machinery,', 'Electrical Equipment', '& Surplus Spares'],
+    description: 'Compare industrial machinery, plant equipment, and surplus inventory from verified Indian sellers.',
     image: featuredEquipment[2].image,
     imageAlt: 'Material handling equipment for Indian businesses',
     imageNote: 'Better use for every asset.',
-    searchPlaceholder: 'Try “forklift” or “commercial vehicle”',
+    searchPlaceholder: 'Search DG sets, transformers, OEM part numbers, and surplus spares…',
   },
 ]
 
@@ -53,7 +54,7 @@ const HomeSearch = memo(function HomeSearch({ initialSearch, navigate, placehold
         placeholder={placeholder}
         aria-label="Search equipment"
       />
-      <button type="submit">Find equipment <ArrowRight size={16} /></button>
+      <button type="submit">Search equipment <ArrowRight size={16} /></button>
     </form>
   )
 })
@@ -64,7 +65,10 @@ export default function Home({ navigate, setSelected, onSaveListing, search, set
     () => !window.matchMedia('(prefers-reduced-motion: reduce)').matches
   )
   const cachedHomeData = getCachedListings('home')
-  const [homeData, setHomeData] = useState(() => cachedHomeData || {
+  const [homeData, setHomeData] = useState(() => cachedHomeData ? {
+    ...cachedHomeData,
+    categories: normalizeCategoryCounts(cachedHomeData.categories),
+  } : {
     listings: [],
     categories: [],
     totalListings: 0,
@@ -105,9 +109,10 @@ export default function Home({ navigate, setSelected, onSaveListing, search, set
     return () => window.clearInterval(interval)
   }, [isAutoPlaying])
 
-  const equipment = homeData.listings
+  const equipment = homeData.listings.filter(isPublicQualityListing)
   const categoryNames = homeData.categories
   const slide = homeSlides[activeSlide]
+  const categoryIcons = { Activity, Boxes, Cog, Factory, Package, PanelTop, Zap }
   const selectSlide = index => setActiveSlide((index + homeSlides.length) % homeSlides.length)
   return (
     <main className="home-page">
@@ -142,7 +147,7 @@ export default function Home({ navigate, setSelected, onSaveListing, search, set
                 {homeSlides.map((item, index) => (
                   <button
                     type="button"
-                    key={item.eyebrow}
+                    key={index}
                     className={`hero-carousel-dot${activeSlide === index ? ' is-active' : ''}`}
                     onClick={() => selectSlide(index)}
                     aria-label={`Show slide ${index + 1}: ${item.eyebrow}`}
@@ -208,8 +213,20 @@ export default function Home({ navigate, setSelected, onSaveListing, search, set
 
       <section className="section container home-categories">
         <SectionHeading eyebrow="The right tool for the job" title="Explore equipment" link="All equipment" onClick={() => navigate('browse')} />
-        <p className="home-section-intro">From DG sets, transformers, and MRO spares to industrial machinery and business vehicles, find equipment for your work.</p>
-        {loading ? <div className="home-category-loader" role="status" aria-label="Loading categories"><LoaderCircle className="action-spinner" size={28} /></div> : error ? <div className="home-state"><p className="data-error">{error}</p><button className="button button-dark" onClick={loadEquipment}>Try again</button></div> : categoryNames.length ? <div className="category-grid">{categoryNames.map((category, index) => <button className="category-card" key={category.name} onClick={() => { setSearch(category.name); navigate('browse') }}><span className={`category-icon ${['blue', 'amber', 'green', 'rose'][index % 4]}`}>⚙</span><span className="category-name">{category.name}</span><span className="category-count">{category.count} listings <ArrowRight size={14} /></span></button>)}</div> : <p className="home-state">No published categories yet.</p>}
+        <p className="home-section-intro">Find heavy electrical equipment, industrial machinery, plant assets, MRO spares, and surplus inventory for your operations.</p>
+        {loading ? <div className="home-category-loader" role="status" aria-label="Loading categories"><LoaderCircle className="action-spinner" size={28} /></div> : error ? <div className="home-state"><p className="data-error">{error}</p><button className="button button-dark" onClick={loadEquipment}>Try again</button></div> : <div className="category-grid">{categoryNames.map(category => { const Icon = categoryIcons[category.icon] || Factory; return <button className="category-card" key={category.name} onClick={() => { setSearch(''); navigate('browse', { filters: { category: category.name } }) }}><span className={`category-icon ${category.color}`}><Icon size={24} aria-hidden="true" /></span><span className="category-name">{category.name}</span><span className="category-count">{category.count} {category.count === 1 ? 'listing' : 'listings'} <ArrowRight size={14} /></span></button> })}</div>}
+      </section>
+
+      <section className="section section-muted home-surplus-section">
+        <div className="container home-surplus-content">
+          <span className="category-icon rose"><Boxes size={24} aria-hidden="true" /></span>
+          <div>
+            <span className="eyebrow">A focused marketplace section</span>
+            <h2>Surplus &amp; Dead Stock</h2>
+            <p>Find unused industrial equipment, excess inventory, and dead stock from verified sellers.</p>
+          </div>
+          <button className="button button-dark" onClick={() => { setSearch(''); navigate('browse', { filters: { inventoryCondition: 'surplus' } }) }}>Browse surplus equipment <ArrowRight size={16} /></button>
+        </div>
       </section>
 
       <section className="section section-muted home-featured">
@@ -219,7 +236,7 @@ export default function Home({ navigate, setSelected, onSaveListing, search, set
           {loading ? <div className="home-category-loader" role="status" aria-label="Loading verified equipment"><LoaderCircle className="action-spinner" size={28} /></div> : error ? <div className="home-state"><p className="data-error">{error}</p><button className="button button-dark" onClick={loadEquipment}>Try again</button></div> : equipment.length ? <>
             <div className="listing-grid home-featured-grid">{equipment.slice(0, 4).map(item => <EquipmentCard item={item} key={item._id} onClick={() => setSelected(item)} onSave={onSaveListing} imageSizes="(max-width: 700px) 45vw, (max-width: 1099px) 33vw, 25vw" />)}</div>
             <button className="home-browse-all-button" onClick={() => navigate('browse')}>Browse all equipment <ArrowRight size={17} /></button>
-          </> : <p className="home-state">No approved equipment yet.</p>}
+          </> : <p className="home-state">No verified equipment is available yet. Check back soon.</p>}
         </div>
       </section>
 

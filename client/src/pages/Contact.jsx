@@ -1,5 +1,6 @@
-import { ArrowLeft, ArrowRight, Clock3, Mail, MapPin, Phone, Send } from 'lucide-react'
-import { useState } from 'react'
+import { ArrowLeft, ArrowRight, Clock3, LoaderCircle, Mail, MapPin, Phone, Send } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { api } from '../api'
 
 const contactDetails = [
   {
@@ -25,24 +26,68 @@ export default function Contact({ navigate }) {
   const [form, setForm] = useState({
     name: '',
     email: '',
+    phone: '',
+    company: '',
     subject: '',
     message: '',
   })
+  const [submitting, setSubmitting] = useState(false)
+  const [success, setSuccess] = useState('')
+  const [error, setError] = useState('')
+  const requestKey = useRef(crypto.randomUUID())
+  const submissionInProgress = useRef(false)
 
   const updateField = event => {
+    setError('')
+    setSuccess('')
     setForm(current => ({
       ...current,
       [event.target.name]: event.target.value,
     }))
   }
 
-  const sendMessage = event => {
+  const sendMessage = async event => {
     event.preventDefault()
-    const subject = encodeURIComponent(form.subject || 'EquipTrade website enquiry')
-    const body = encodeURIComponent(
-      `Name: ${form.name}\nEmail: ${form.email}\n\n${form.message}`
-    )
-    window.location.href = `mailto:info@equiptradeindia.com?subject=${subject}&body=${body}`
+    if (submissionInProgress.current) return
+
+    const name = form.name.trim()
+    const email = form.email.trim()
+    const subject = form.subject.trim()
+    const message = form.message.trim()
+    const phone = form.phone.trim()
+
+    if (!name || !email || !subject || !message) {
+      setError('Please complete your name, email address, subject, and message.')
+      return
+    }
+    if (phone && !/^[+()\d\s.-]{7,30}$/.test(phone)) {
+      setError('Enter a valid phone number or leave the field blank.')
+      return
+    }
+
+    setSubmitting(true)
+    submissionInProgress.current = true
+    setError('')
+    setSuccess('')
+    try {
+      const result = await api.submitContactEnquiry({
+        ...form,
+        name,
+        email,
+        phone,
+        subject,
+        message,
+      }, requestKey.current)
+      setSuccess(`${result.message} Enquiry ID: ${result.leadId}`)
+      setForm({ name: '', email: '', phone: '', company: '', subject: '', message: '' })
+      requestKey.current = crypto.randomUUID()
+    } catch (requestError) {
+      console.error('Failed to submit contact enquiry:', requestError)
+      setError(requestError.message || 'We could not submit your enquiry. Please try again.')
+    } finally {
+      setSubmitting(false)
+      submissionInProgress.current = false
+    }
   }
 
   return (
@@ -88,13 +133,13 @@ export default function Contact({ navigate }) {
           <div className="contact-form-heading">
             <span className="contact-section-kicker">SEND A MESSAGE</span>
             <h2>How can we help?</h2>
-            <p>Fill in the details below. Your email app will open with your message ready to send.</p>
+            <p>Share a few details and our team will follow up with you.</p>
           </div>
 
           <div className="contact-form-row">
             <label>
-              Your name
-              <input name="name" value={form.name} onChange={updateField} autoComplete="name" required placeholder="e.g. Aditi Sharma" />
+              Full name
+              <input name="name" value={form.name} onChange={updateField} autoComplete="name" maxLength={120} required placeholder="e.g. Aditi Sharma" />
             </label>
             <label>
               Email address
@@ -102,9 +147,20 @@ export default function Contact({ navigate }) {
             </label>
           </div>
 
+          <div className="contact-form-row">
+            <label>
+              Phone number (optional)
+              <input name="phone" type="tel" value={form.phone} onChange={updateField} autoComplete="tel" maxLength={30} placeholder="+91 98765 43210" />
+            </label>
+            <label>
+              Company name (optional)
+              <input name="company" value={form.company} onChange={updateField} autoComplete="organization" maxLength={160} placeholder="Your company" />
+            </label>
+          </div>
+
           <label>
-            Subject
-            <input name="subject" value={form.subject} onChange={updateField} required placeholder="What would you like help with?" />
+            Enquiry subject or equipment of interest
+            <input name="subject" value={form.subject} onChange={updateField} maxLength={200} required placeholder="e.g. 500 kVA DG set or surplus spares" />
           </label>
 
           <label>
@@ -112,10 +168,12 @@ export default function Contact({ navigate }) {
             <textarea name="message" value={form.message} onChange={updateField} required rows={5} maxLength={3000} placeholder="Tell us a little about your question..." />
           </label>
 
-          <button className="contact-submit" type="submit">
-            Continue to email <ArrowRight size={16} />
+          {error && <p className="contact-form-error" role="alert">{error}</p>}
+          {success && <p className="contact-form-success" role="status">{success}</p>}
+          <button className="contact-submit" type="submit" disabled={submitting}>
+            {submitting ? <><LoaderCircle className="action-spinner" size={16} /> Submitting…</> : <>Submit enquiry <ArrowRight size={16} /></>}
           </button>
-          <span className="contact-form-footnote"><Mail size={13} /> Opens your email app to send the message to info@equiptradeindia.com</span>
+          <span className="contact-form-footnote"><Mail size={13} /> Your message is sent securely to the EquipTrade India team.</span>
         </form>
       </section>
 

@@ -33,6 +33,7 @@ import {
   setCachedProduct,
 } from '../marketplaceCache'
 import { toProductSlug } from '../productSlug'
+import { isPublicQualityListing } from '../listingQuality'
 import { isListingSaved, toggleSavedListing } from '../savedListings'
 import '../product-detail.css'
 
@@ -64,10 +65,11 @@ export default function ProductDetail({
   user,
 }) {
   const [item, setItem] = useState(() => {
-    if (initialProduct && matchesProductSlug(initialProduct, slug)) {
+    if (initialProduct && isPublicQualityListing(initialProduct) && matchesProductSlug(initialProduct, slug)) {
       return initialProduct
     }
-    return getCachedProduct(slug) || null
+    const cachedProduct = getCachedProduct(slug)
+    return isPublicQualityListing(cachedProduct) ? cachedProduct : null
   })
 
   const [loading, setLoading] = useState(!item)
@@ -142,7 +144,8 @@ export default function ProductDetail({
     const requestId = ++productRequestVersion.current
 
     try {
-      const cachedProduct = getCachedProduct(slug)
+      const cachedCandidate = getCachedProduct(slug)
+      const cachedProduct = isPublicQualityListing(cachedCandidate) ? cachedCandidate : null
       if (!cachedProduct) setLoading(true)
       setError('')
 
@@ -152,7 +155,7 @@ export default function ProductDetail({
       // First try specific endpoint
       try {
         const direct = await api.getEquipmentByIdOrSlug(slug)
-        if (direct && direct.name) {
+        if (isPublicQualityListing(direct)) {
           found = direct
         }
       } catch {
@@ -172,7 +175,7 @@ export default function ProductDetail({
         setCachedListings('all', data)
         listingsLoaded = true
         found = data.find(listing =>
-          matchesProductSlug(listing, slug)
+          isPublicQualityListing(listing) && matchesProductSlug(listing, slug)
         )
       }
 
@@ -214,7 +217,7 @@ export default function ProductDetail({
 
   useEffect(() => {
     const selectedProduct =
-      initialProduct && matchesProductSlug(initialProduct, slug)
+      initialProduct && isPublicQualityListing(initialProduct) && matchesProductSlug(initialProduct, slug)
         ? initialProduct
         : item
 
@@ -226,7 +229,7 @@ export default function ProductDetail({
       setLoading(false)
     }
 
-    if (!selectedProduct || !matchesProductSlug(selectedProduct, slug)) {
+    if (!selectedProduct || !isPublicQualityListing(selectedProduct) || !matchesProductSlug(selectedProduct, slug)) {
       loadProduct()
       return () => {
         productRequestVersion.current += 1
@@ -271,6 +274,7 @@ export default function ProductDetail({
     return allListings
       .filter(
         listing =>
+          isPublicQualityListing(listing) &&
           (listing._id || listing.id) !== (item._id || item.id) &&
           (listing.category === item.category || !item.category)
       )
@@ -578,10 +582,14 @@ export default function ProductDetail({
                 </div>
               )}
 
-              <span className="pd-badge-verified">
-                <BadgeCheck size={14} />
-                Verified Equipment
-              </span>
+              {['approved', 'published'].includes(item.status) &&
+                item.isActive !== false &&
+                item.isQualityHold !== true && (
+                <span className="pd-badge-verified">
+                  <BadgeCheck size={14} />
+                  Verified Equipment
+                </span>
+              )}
 
               {images.length > 1 && (
                 <span className="pd-image-counter">
@@ -653,6 +661,11 @@ export default function ProductDetail({
           </div>
 
           <h1 className="pd-title">{item.name}</h1>
+          {item.inventoryCondition && (
+            <span className="inventory-condition-badge pd-inventory-condition-badge">
+              {item.inventoryCondition}
+            </span>
+          )}
 
           <p className="pd-subtitle">
             {item.brand || 'Brand not specified'} ·{' '}
@@ -752,8 +765,8 @@ export default function ProductDetail({
           <div className="detail-note">
             <ShieldCheck size={18} />
             <span>
-              <strong>Reviewed by EquipTrade team.</strong> Photos, registration,
-              and seller profile have been authenticated.
+              <strong>Reviewed by EquipTrade team.</strong> Contact the seller to confirm
+              equipment details and arrange an inspection before purchase.
             </span>
           </div>
         </div>
@@ -807,6 +820,13 @@ export default function ProductDetail({
             <strong>{item.model || 'Not specified'}</strong>
           </div>
 
+          {item.oemPartNumber && (
+            <div className="pd-spec-row">
+              <span>OEM Part Number</span>
+              <strong>{item.oemPartNumber}</strong>
+            </div>
+          )}
+
           <div className="pd-spec-row">
             <span>Manufacturing Year</span>
             <strong>{item.year || 'Not specified'}</strong>
@@ -816,6 +836,13 @@ export default function ProductDetail({
             <span>Equipment Condition</span>
             <strong>{item.condition || 'Inspected'}</strong>
           </div>
+
+          {item.inventoryCondition && (
+            <div className="pd-spec-row">
+              <span>Inventory Condition</span>
+              <strong>{item.inventoryCondition}</strong>
+            </div>
+          )}
 
           <div className="pd-spec-row">
             <span>Operational Hours / Usage</span>
@@ -830,14 +857,19 @@ export default function ProductDetail({
           <div className="pd-spec-row">
             <span>Verification Status</span>
             <strong style={{ color: '#277258' }}>
-              ✓ Authenticated by EquipTrade
+              {item.verificationStatus || 'Approved by EquipTrade'}
             </strong>
           </div>
 
           <div className="pd-spec-row">
             <span>Direct Seller</span>
             <strong>
-              {item.seller?.name || 'Verified Industrial Business'}
+              {item.seller?.name || 'Seller details available on enquiry'}
+              {item.seller?.verified === true && (
+                <span className="pd-seller-verified">
+                  <BadgeCheck size={13} /> Verified seller
+                </span>
+              )}
             </strong>
           </div>
         </div>

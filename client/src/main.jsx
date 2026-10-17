@@ -255,8 +255,27 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [toast, setToast] = useState('')
   const [authError, setAuthError] = useState('')
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(
+    () => new URLSearchParams(window.location.search).get('search') || ''
+  )
   const [selected, setSelected] = useState(null)
+  const [browseFilters, setBrowseFilters] = useState(() => {
+    const params = new URLSearchParams(window.location.search)
+    const filterNames = [
+      'category',
+      'condition',
+      'inventoryCondition',
+      'oemPartNumber',
+      'location',
+      'minPrice',
+      'maxPrice',
+      'sort',
+    ]
+    const filters = Object.fromEntries(
+      filterNames.map(name => [name, params.get(name) || ''])
+    )
+    return filterNames.some(name => filters[name]) ? filters : null
+  })
   const [profileOpen, setProfileOpen] = useState(false)
   const [cookieConsentAccepted, setCookieConsentAccepted] = useState(
     hasAcceptedCookieConsent
@@ -718,6 +737,10 @@ function App() {
   const navigate = (nextPage, options = {}) => {
     let nextPath = pageToPath[nextPage]
 
+    if (nextPage === 'browse') {
+      setBrowseFilters(options.filters || {})
+    }
+
     if (nextPage === 'product-detail') {
       const slug =
         options.slug ||
@@ -1146,6 +1169,7 @@ function App() {
               navigate('product-detail', { product: item, slug })
             }}
             navigate={navigate}
+            initialFilters={browseFilters}
           />
         )}
 
@@ -1550,7 +1574,7 @@ function LegacyHome({
               onChange={e =>
                 setSearch(e.target.value)
               }
-              placeholder="Search machines, brands or categories"
+              placeholder="Search DG sets, transformers, OEM part numbers, and surplus spares…"
             />
 
             <button
@@ -1634,8 +1658,8 @@ function LegacyHome({
               </h2>
 
               <p>
-                Compare verified machines,
-                tools and vehicles from
+                Compare verified machinery,
+                industrial equipment and spares from
                 across India.
               </p>
 
@@ -1880,7 +1904,7 @@ function LegacyBrowse({
             onChange={e =>
               setSearch(e.target.value)
             }
-            placeholder="Search by name, brand, model or location"
+            placeholder="Search equipment, brand, OEM part number or location"
           />
         </div>
 
@@ -2581,11 +2605,15 @@ function EquipmentCard({
           alt={item.name}
         />
 
-        <span className="listing-tag">
-          <BadgeCheck size={13} />
-          {item.tag ||
-            'Verified Equipment'}
-        </span>
+        {['approved', 'published'].includes(item.status) && (
+          <span className="listing-tag">
+            <BadgeCheck size={13} />
+            Verified Equipment
+          </span>
+        )}
+        {item.inventoryCondition && (
+          <span className="inventory-condition-badge">{item.inventoryCondition}</span>
+        )}
       </button>
 
       <div className="equipment-body">
@@ -2608,6 +2636,9 @@ function EquipmentCard({
           {item.brand} · {item.model} ·{' '}
           {item.condition}
         </p>
+        {item.oemPartNumber && (
+          <p className="equipment-oem-part-number">OEM Part No.: {item.oemPartNumber}</p>
+        )}
 
         <div className="equipment-footer">
 

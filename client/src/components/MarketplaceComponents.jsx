@@ -44,6 +44,18 @@ export function EquipmentCard({ item, onClick, onSave, imageSizes }) {
     <article
       className="equipment-card"
       onClick={onClick}
+      onKeyDown={event => {
+        if (
+          event.target === event.currentTarget &&
+          (event.key === 'Enter' || event.key === ' ')
+        ) {
+          event.preventDefault()
+          onClick?.(item)
+        }
+      }}
+      role="link"
+      tabIndex={0}
+      aria-label={`View details for ${item.name}`}
       style={{ cursor: 'pointer' }}
     >
       <button
@@ -75,15 +87,29 @@ export function EquipmentCard({ item, onClick, onSave, imageSizes }) {
             No image provided
           </span>
         )}
-        <span className="listing-tag">
-          <BadgeCheck size={13} /> Verified
-        </span>
+        {['approved', 'published'].includes(item.status) &&
+          item.isActive !== false &&
+          item.isQualityHold !== true && (
+            <span className="listing-tag">
+              <BadgeCheck size={13} /> Verified
+            </span>
+          )}
+        {(item.inventoryCondition || item.condition) && (
+          <div className="equipment-condition-badges">
+            {item.condition && (
+              <span className="equipment-condition-badge">{item.condition}</span>
+            )}
+            {item.inventoryCondition && (
+              <span className="inventory-condition-badge">{item.inventoryCondition}</span>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="equipment-body">
         <div className="listing-meta">
           <span>{item.category}</span>
-          <span>{item.year || 'Year not provided'}</span>
+          {item.year && <span>{item.year}</span>}
         </div>
 
         <h3>{item.name}</h3>
@@ -91,24 +117,42 @@ export function EquipmentCard({ item, onClick, onSave, imageSizes }) {
           {item.listingType === 'rental' ? 'For rent' : 'For sale'}
         </span>
 
-        <p>
-          {item.brand || 'Brand not provided'} · {item.model || 'Model not provided'} · {item.condition || 'Condition not provided'}
-        </p>
+        {(item.brand || item.model) && (
+          <p className="equipment-manufacturer-model">
+            {[item.brand, item.model].filter(Boolean).join(' · ')}
+          </p>
+        )}
+        {item.seller?.name && (
+          <p className="equipment-seller-name">
+            Seller: {item.seller.name}
+            {item.seller.verified === true && (
+              <span className="equipment-seller-verified">
+                <BadgeCheck size={12} /> Verified seller
+              </span>
+            )}
+          </p>
+        )}
+        {item.oemPartNumber && (
+          <p className="equipment-oem-part-number">OEM Part No.: {item.oemPartNumber}</p>
+        )}
 
         <div className="equipment-footer">
           <strong>
-            {item.price
+            {Number.isFinite(Number(item.price)) && item.price !== null && item.price !== ''
               ? `₹${Number(item.price).toLocaleString('en-IN')}`
-              : 'Price on request'}
+              : 'Contact for Price'}
           </strong>
-          <span>
-            <Building2 size={14} /> {(item.location || 'Location not provided').split(',')[0]}
-          </span>
+          {item.location && (
+            <span>
+              <Building2 size={14} /> {item.location.split(',')[0]}
+            </span>
+          )}
         </div>
 
         <button
           type="button"
           className="equipment-see-details-button"
+          aria-label={`View details for ${item.name}`}
           onClick={event => {
             event.stopPropagation()
             onClick?.(item)

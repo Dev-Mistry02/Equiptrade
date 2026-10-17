@@ -9,7 +9,9 @@ import authRoutes from './routes/auth.routes.js';
 import equipmentRoutes from './routes/equipment.routes.js';
 import feedbackRoutes from './routes/feedback.routes.js';
 import adminRoutes from './routes/admin.routes.js';
+import leadRoutes from './routes/lead.routes.js';
 import User from './models/User.js';
+import Equipment from './models/Equipment.js';
 
 const app = express();
 
@@ -76,6 +78,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/equipment', equipmentRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/leads', leadRoutes);
 
 app.use('/api', (_req, res) => {
   res.status(404).json({
@@ -132,6 +135,31 @@ async function ensureUserIndexes() {
   );
 }
 
+async function restoreListingsHeldByOverbroadDescriptionCheck() {
+  const result = await Equipment.updateMany(
+    {
+      status: { $in: ['approved', 'published'] },
+      isQualityHold: true,
+      qualityReviewReason: 'Potential development or placeholder listing details; review before republishing.',
+      name: {
+        $type: 'string',
+        $not: /(^|[\s_-])(hell|test|demo|dummy|sample|placeholder|asdf|qwerty)([\s_-]|$)/i,
+      },
+    },
+    {
+      $set: {
+        isQualityHold: false,
+        isActive: true,
+        qualityReviewReason: '',
+      },
+    }
+  );
+
+  if (result.modifiedCount > 0) {
+    console.info(`Restored ${result.modifiedCount} approved listing(s) hidden by the previous description check.`);
+  }
+}
+
 async function connectToDatabase() {
   if (!env.mongoUri) {
     throw new Error('MONGO_URI is missing from environment variables.');
@@ -154,6 +182,7 @@ async function connectToDatabase() {
       console.log('MongoDB connected successfully.');
 
       await ensureUserIndexes();
+      await restoreListingsHeldByOverbroadDescriptionCheck();
 
       console.log('MongoDB indexes verified successfully.');
 

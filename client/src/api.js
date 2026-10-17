@@ -1,3 +1,5 @@
+import { categories, matchesEquipmentCategory } from './data'
+
 const HOSTED_API_URL = 'https://backend-6qf7.onrender.com/api'
 const COLD_START_TIMEOUT_MS = 60000
 const configuredApiUrl = import.meta.env.VITE_API_URL?.trim()
@@ -28,6 +30,17 @@ export const API_URL = useDevelopmentProxy
   : baseApiUrl.endsWith('/api')
     ? baseApiUrl.replace(/\/+$/, '')
     : `${baseApiUrl.replace(/\/+$/, '')}/api`
+
+export function normalizeCategoryCounts(categoryCounts = []) {
+  return categories.map(category => ({
+    ...category,
+    count: categoryCounts
+      .filter(({ name }) =>
+        category.aliases.some(alias => alias.toLowerCase() === name?.toLowerCase())
+      )
+      .reduce((total, item) => total + Number(item.count || 0), 0),
+  }))
+}
 
 const USER_ACCESS_TOKEN_KEY = 'equiptrade_user_access_token'
 
@@ -189,6 +202,7 @@ export const api = {
         const listings = await api.getEquipment(undefined, options)
         return {
           ...homeData,
+          categories: normalizeCategoryCounts(homeData.categories),
           listings: listings.slice(0, 4).map(listing => ({
             ...listing,
             images: listing.images?.slice(0, 1) || [],
@@ -196,7 +210,10 @@ export const api = {
         }
       }
 
-      return homeData
+      return {
+        ...homeData,
+        categories: normalizeCategoryCounts(homeData.categories),
+      }
     } catch (error) {
       if (
         error.status !== 404 ||
@@ -206,25 +223,17 @@ export const api = {
       }
 
       const listings = await api.getEquipment(undefined, options)
-      const categoryCounts = new Map()
-
-      listings.forEach(listing => {
-        if (listing.category) {
-          categoryCounts.set(
-            listing.category,
-            (categoryCounts.get(listing.category) || 0) + 1
-          )
-        }
-      })
-
       return {
         listings: listings.slice(0, 4).map(listing => ({
           ...listing,
           images: listing.images?.slice(0, 1) || [],
         })),
-        categories: [...categoryCounts]
-          .sort(([left], [right]) => left.localeCompare(right))
-          .map(([name, count]) => ({ name, count })),
+        categories: categories.map(category => ({
+          ...category,
+          count: listings.filter(listing =>
+            matchesEquipmentCategory(listing, category.name)
+          ).length,
+        })),
         totalListings: listings.length,
       }
     }
@@ -237,7 +246,8 @@ export const api = {
       typeof filters === 'string' &&
       filters
     ) {
-      params.set('search', filters)
+      const search = filters.trim().replace(/\s+/g, ' ')
+      if (search) params.set('search', search)
     }
 
     if (
@@ -251,7 +261,10 @@ export const api = {
             value !== undefined &&
             value !== null
           ) {
-            params.set(key, value)
+            const normalizedValue = key === 'search' && typeof value === 'string'
+              ? value.trim().replace(/\s+/g, ' ')
+              : value
+            if (normalizedValue !== '') params.set(key, normalizedValue)
           }
         }
       )
@@ -278,6 +291,31 @@ export const api = {
       timeoutMs: COLD_START_TIMEOUT_MS,
     }),
 
+  getAdminLeads: filters => {
+    const params = new URLSearchParams()
+    Object.entries(filters || {}).forEach(([key, value]) => {
+      if (value !== '' && value !== undefined && value !== null) {
+        params.set(key, value)
+      }
+    })
+    return request(`/admin/leads${params.size ? `?${params}` : ''}`, {
+      timeoutMs: COLD_START_TIMEOUT_MS,
+    })
+  },
+
+  updateLead: (id, payload) =>
+    request(`/admin/leads/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+
+  submitContactEnquiry: (payload, idempotencyKey) =>
+    request('/leads', {
+      method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify(payload),
+    }),
+
   updateSubmissionStatus: (
     id,
     status
@@ -291,6 +329,18 @@ export const api = {
         }),
       }
     ),
+
+  updateSubmissionDetails: (id, payload) =>
+    request(`/admin/submissions/${id}/details`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+
+  updateSubmissionQualityHold: (id, isQualityHold) =>
+    request(`/admin/submissions/${id}/quality-hold`, {
+      method: 'PATCH',
+      body: JSON.stringify({ isQualityHold }),
+    }),
 
   deleteSubmission: id =>
     request(

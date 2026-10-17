@@ -622,6 +622,137 @@ h2 em {
     left: 13px
 }
 
+.inventory-condition-badge {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    max-width: 100%;
+    border: 1px solid #e8c66c;
+    border-radius: 999px;
+    padding: 6px 9px;
+    color: #725411;
+    background: #fff8df;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1.2
+}
+
+.equipment-image .inventory-condition-badge {
+    position: absolute;
+    top: 13px;
+    right: 13px;
+    z-index: 1
+}
+
+.pd-inventory-condition-badge {
+    margin: 0 0 12px
+}
+
+.home-surplus-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px
+}
+
+.home-surplus-content .category-icon {
+    flex: 0 0 48px;
+    width: 48px;
+    height: 48px;
+    margin: 0
+}
+
+.home-surplus-content h2,
+.browse-surplus-callout h2 {
+    margin: 5px 0;
+    font: 600 24px/1.15 Space Grotesk
+}
+
+.home-surplus-content p,
+.browse-surplus-callout p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.55
+}
+
+.browse-surplus-callout {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 0 0 24px;
+    padding: 18px 20px;
+    border: 1px solid #e7dcae;
+    border-radius: 12px;
+    background: #fffaf0
+}
+
+.browse-surplus-icon {
+    display: grid;
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
+    place-items: center;
+    border-radius: 10px;
+    color: #725411;
+    background: #f7eccb
+}
+
+.browse-surplus-callout > div:nth-child(2) {
+    flex: 1
+}
+
+.equipment-oem-part-number {
+    margin: 7px 0 0;
+    color: #526c7d;
+    font-size: 11px;
+    font-weight: 600;
+    overflow-wrap: anywhere
+}
+
+.admin-oem-part-number-form {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    margin-top: 18px
+}
+
+.admin-oem-part-number-form label {
+    display: grid;
+    flex: 1;
+    gap: 6px;
+    color: #62788c;
+    font-size: 12px
+}
+
+.admin-oem-part-number-form input {
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    padding: 10px;
+    color: var(--ink);
+    font: inherit
+}
+
+@media (max-width: 700px) {
+    .home-surplus-content,
+    .browse-surplus-callout {
+        align-items: flex-start;
+        flex-direction: column
+    }
+
+    .home-surplus-content .button,
+    .browse-surplus-callout .button {
+        width: 100%;
+        justify-content: center
+    }
+
+    .admin-oem-part-number-form {
+        align-items: stretch;
+        flex-direction: column
+    }
+}
+
 .heart {
     z-index: 1;
     color: #657d8a;
@@ -2478,4 +2609,3 @@ td small {
   padding: 0;
   cursor: pointer;
 }
-

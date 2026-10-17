@@ -9,6 +9,7 @@ import {
 import imageCompression from 'browser-image-compression'
 import { z } from 'zod'
 import { api } from '../api'
+import { inventoryConditions } from '../data'
 
 const numericInput = value => {
   if (typeof value !== 'string') return value
@@ -33,12 +34,12 @@ const CATEGORY_OPTIONS = [
   'Material Handling Equipment',
   'Industrial Equipment',
   'DG Sets & Generators',
-  'Transformers',
+  'Power Transformers',
+  'Switchgear & HT Panels',
   'Heavy Industrial Motors',
-  'Electrical Equipment',
-  'MRO Spare Parts',
-  'Surplus Industrial Machinery',
-  'Business Vehicles',
+  'Industrial Plant Equipment',
+  'MRO Spares & Components',
+  'Surplus / Dead Stock Equipment',
   'Welding Equipment',
   'Compressors',
   'Generators',
@@ -71,6 +72,8 @@ const equipmentSchema = z.object({
     .trim()
     .min(1, 'Model is required.'),
 
+  oemPartNumber: z.string().trim().optional(),
+
   year: z.preprocess(
     numericInput,
     z
@@ -93,6 +96,11 @@ const equipmentSchema = z.object({
     .string()
     .trim()
     .min(1, 'Condition is required.'),
+
+  inventoryCondition: z.preprocess(
+    value => value === '' ? undefined : value,
+    z.enum(inventoryConditions).optional()
+  ),
 
   price: z.preprocess(
     numericInput,
@@ -155,8 +163,10 @@ export default function Sell({
     category: '',
     brand: '',
     model: '',
+    oemPartNumber: '',
     year: '',
     condition: '',
+    inventoryCondition: '',
     price: '',
     location: '',
     description: '',
@@ -707,6 +717,16 @@ export default function Sell({
                   />
                 </label>
 
+                <label>
+                  OEM part number (optional)
+                  <input
+                    name="oemPartNumber"
+                    value={form.oemPartNumber}
+                    onChange={update}
+                    placeholder="e.g. 3RT2036-1AP00"
+                  />
+                </label>
+
                 {/* Manufacturing Year */}
                 <label>
                   Manufacturing year
@@ -744,6 +764,20 @@ export default function Sell({
                       >
                         {condition}
                       </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  Inventory condition (optional)
+                  <select
+                    name="inventoryCondition"
+                    value={form.inventoryCondition}
+                    onChange={update}
+                  >
+                    <option value="">Select inventory condition</option>
+                    {inventoryConditions.map(condition => (
+                      <option key={condition} value={condition}>{condition}</option>
                     ))}
                   </select>
                 </label>
@@ -1030,10 +1064,24 @@ export default function Sell({
                       {form.model}
                     </span>
 
+                    {form.oemPartNumber && (
+                      <span>
+                        <b>OEM part number</b>
+                        {form.oemPartNumber}
+                      </span>
+                    )}
+
                     <span>
                       <b>Condition</b>
                       {form.condition}
                     </span>
+
+                    {form.inventoryCondition && (
+                      <span>
+                        <b>Inventory condition</b>
+                        {form.inventoryCondition}
+                      </span>
+                    )}
 
                     <span>
                       <b>Location</b>

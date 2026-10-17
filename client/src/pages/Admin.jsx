@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useState } from 'react'
 import { LoaderCircle, ShieldCheck, Trash2, X, RefreshCw } from 'lucide-react'
 import { api } from '../api'
+import LeadsDashboard from './LeadsDashboard'
 
 export default function Admin({ notify }) {
   // --------------------------------------------------
@@ -11,6 +12,7 @@ export default function Admin({ notify }) {
   const [error, setError] = useState('')
   const [expandedId, setExpandedId] = useState(null)
   const [processingId, setProcessingId] = useState(null)
+  const [oemPartNumberDraft, setOemPartNumberDraft] = useState('')
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
@@ -185,6 +187,42 @@ export default function Admin({ notify }) {
     }
   }
 
+  const updateOemPartNumber = async id => {
+    if (processingId) return
+    setProcessingId(id)
+    try {
+      const updated = await api.updateSubmissionDetails(id, {
+        oemPartNumber: oemPartNumberDraft,
+      })
+      setSubmissions(items => items.map(item =>
+        item._id === id ? { ...item, ...updated } : item
+      ))
+      notify('OEM part number updated.')
+    } catch (requestError) {
+      console.error('Failed to update OEM part number:', requestError)
+      notify(requestError.message || 'Failed to update OEM part number.')
+    } finally {
+      setProcessingId(null)
+    }
+  }
+
+  const updateQualityHold = async (id, isQualityHold) => {
+    if (processingId) return
+    setProcessingId(id)
+    try {
+      const updated = await api.updateSubmissionQualityHold(id, isQualityHold)
+      setSubmissions(items => items.map(item =>
+        item._id === id ? { ...item, ...updated } : item
+      ))
+      notify(isQualityHold ? 'Listing placed on quality hold.' : 'Quality hold cleared; listing is active if approved.')
+    } catch (requestError) {
+      console.error('Failed to update listing quality hold:', requestError)
+      notify(requestError.message || 'Unable to update listing quality review.')
+    } finally {
+      setProcessingId(null)
+    }
+  }
+
   // --------------------------------------------------
   // Delete submission
   // --------------------------------------------------
@@ -248,6 +286,10 @@ export default function Admin({ notify }) {
   // --------------------------------------------------
 
   const toggleDetails = (id) => {
+    if (expandedId !== id) {
+      const item = submissions.find(submission => submission._id === id)
+      setOemPartNumberDraft(item?.oemPartNumber || '')
+    }
     setExpandedId((currentId) =>
       currentId === id ? null : id
     )
@@ -313,6 +355,7 @@ export default function Admin({ notify }) {
 
       </section>
 
+      <LeadsDashboard notify={notify} />
 
       {/* ================================
           METRICS
@@ -637,6 +680,11 @@ export default function Admin({ notify }) {
                           item.status
                         )}
                       </span>
+                      {item.qualityReviewFlag && (
+                        <span className="submission-status status-rejected">
+                          Quality review required
+                        </span>
+                      )}
 
                     </td>
 
@@ -755,6 +803,21 @@ export default function Admin({ notify }) {
                             <span className="eyebrow">
                               Product details
                             </span>
+                            {item.qualityReviewFlag && (
+                              <>
+                                <p className="data-error">
+                                  {item.qualityReviewReason || 'Potential placeholder listing. Review before republishing.'}
+                                </p>
+                                <button
+                                  type="button"
+                                  className="button button-dark"
+                                  disabled={processingId === item._id}
+                                  onClick={() => updateQualityHold(item._id, false)}
+                                >
+                                  Clear quality hold and reactivate
+                                </button>
+                              </>
+                            )}
 
                             <h3>
                               {item.name}
@@ -790,6 +853,13 @@ export default function Admin({ notify }) {
                                   'Not available'}
                               </span>
 
+                              {item.oemPartNumber && (
+                                <span>
+                                  <b>OEM part number</b>
+                                  {item.oemPartNumber}
+                                </span>
+                              )}
+
                               <span>
                                 <b>Year</b>
                                 {item.year ||
@@ -801,6 +871,13 @@ export default function Admin({ notify }) {
                                 {item.condition ||
                                   'Not available'}
                               </span>
+
+                              {item.inventoryCondition && (
+                                <span>
+                                  <b>Inventory condition</b>
+                                  {item.inventoryCondition}
+                                </span>
+                              )}
 
                               <span>
                                 <b>Location</b>
@@ -827,6 +904,31 @@ export default function Admin({ notify }) {
                               </span>
 
                             </div>
+
+                            <form
+                              className="admin-oem-part-number-form"
+                              onSubmit={event => {
+                                event.preventDefault()
+                                updateOemPartNumber(item._id)
+                              }}
+                            >
+                              <label>
+                                OEM part number
+                                <input
+                                  value={item._id === expandedId ? oemPartNumberDraft : item.oemPartNumber || ''}
+                                  onChange={event => setOemPartNumberDraft(event.target.value)}
+                                  maxLength={120}
+                                  placeholder="Add or update OEM part number"
+                                />
+                              </label>
+                              <button
+                                type="submit"
+                                className="button button-dark"
+                                disabled={processingId === item._id}
+                              >
+                                Save part number
+                              </button>
+                            </form>
 
                           </div>
 

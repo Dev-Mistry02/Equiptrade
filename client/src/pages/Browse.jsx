@@ -1,4 +1,5 @@
 import {
+  Boxes,
   ChevronDown,
   Filter,
   LoaderCircle,
@@ -9,8 +10,9 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import { EquipmentCard } from '../components/MarketplaceComponents'
-import { categories } from '../data'
+import { categories, inventoryConditions } from '../data'
 import { getCachedListings, setCachedListings } from '../marketplaceCache'
+import { isPublicQualityListing } from '../listingQuality'
 import { toProductSlug } from '../productSlug'
 
 function getBrowseCacheKey(search, filters) {
@@ -23,16 +25,21 @@ export default function Browse({
   setSelected,
   onSaveListing,
   navigate,
+  initialFilters,
 }) {
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState(() => ({
     category: '',
     condition: '',
+    inventoryCondition: '',
+    oemPartNumber: '',
     location: '',
     minPrice: '',
     maxPrice: '',
-  })
+    ...initialFilters,
+  }))
+  const [sort, setSort] = useState(initialFilters?.sort || 'newest')
 
-  const browseCacheKey = getBrowseCacheKey(search, filters)
+  const browseCacheKey = getBrowseCacheKey(search, { ...filters, sort })
   const [equipment, setEquipment] = useState(
     () => getCachedListings(browseCacheKey) || []
   )
@@ -43,6 +50,36 @@ export default function Browse({
   const [showFilters, setShowFilters] = useState(false)
   const requestVersion = useRef(0)
   const activeRequest = useRef(null)
+
+  useEffect(() => {
+    if (!initialFilters) return
+    setFilters({
+      category: initialFilters.category || '',
+      condition: initialFilters.condition || '',
+      inventoryCondition: initialFilters.inventoryCondition || '',
+      oemPartNumber: initialFilters.oemPartNumber || '',
+      location: initialFilters.location || '',
+      minPrice: initialFilters.minPrice || '',
+      maxPrice: initialFilters.maxPrice || '',
+    })
+    setSort(initialFilters.sort || 'newest')
+  }, [initialFilters])
+
+  useEffect(() => {
+    if (window.location.pathname !== '/buy') return
+    const params = new URLSearchParams()
+    if (search.trim()) params.set('search', search.trim().replace(/\s+/g, ' '))
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value) params.set(key, value)
+    })
+    if (sort !== 'newest') params.set('sort', sort)
+    const query = params.toString()
+    window.history.replaceState(
+      {},
+      '',
+      `${window.location.pathname}${query ? `?${query}` : ''}`
+    )
+  }, [search, filters, sort])
   
   const priceRange = (() => {
     const prices = equipment
@@ -61,13 +98,16 @@ export default function Browse({
       max: Math.max(...prices),
     }
   })()
+  const hasPricedListings = equipment.some(item =>
+    typeof item.price === 'number' && Number.isFinite(item.price)
+  )
 
   /*
    * Fetch marketplace data
    */
   const fetchEquipment = useCallback(async ({ showLoading = true } = {}) => {
     const requestId = ++requestVersion.current
-    const cacheKey = getBrowseCacheKey(search, filters)
+    const cacheKey = getBrowseCacheKey(search, { ...filters, sort })
     const hasCachedListings = Boolean(getCachedListings(cacheKey))
     activeRequest.current?.abort()
 
@@ -81,6 +121,7 @@ export default function Browse({
       const data = await api.getEquipment({
         search,
         ...filters,
+        sort,
       }, {
         signal: controller.signal,
       })
@@ -96,16 +137,14 @@ export default function Browse({
     } catch (error) {
       if (requestId !== requestVersion.current) return
       console.error('Failed to load marketplace:', error)
-      if (!hasCachedListings) {
-        setError(error.message || 'Unable to load marketplace.')
-      }
+      setError(error.message || 'Unable to load marketplace.')
     } finally {
       if (requestId === requestVersion.current) {
         activeRequest.current = null
         setLoading(false)
       }
     }
-  }, [search, filters])
+  }, [search, filters, sort])
 
 
 
@@ -160,7 +199,7 @@ export default function Browse({
     return () => clearInterval(interval)
   }, [fetchEquipment])
 
-  const filtered = equipment
+  const filtered = equipment.filter(isPublicQualityListing)
 
   /*
    * Update filters
@@ -181,6 +220,8 @@ export default function Browse({
     setFilters({
       category: '',
       condition: '',
+      inventoryCondition: '',
+      oemPartNumber: '',
       location: '',
       minPrice: '',
       maxPrice: '',
@@ -211,16 +252,33 @@ export default function Browse({
           </span>
 
           <h1>
-            Make Your Product Sell Here !
+            Browse Verified Industrial Equipment
           </h1>
 
           <p>
-            Verified listings from businesses and specialists
-            across India.
+            Discover industrial machinery, electrical equipment, surplus inventory, and genuine spare parts from verified sellers.
           </p>
         </div>
       </div>
 
+      <section className="browse-surplus-callout" aria-labelledby="browse-surplus-title">
+        <div className="browse-surplus-icon"><Boxes size={22} /></div>
+        <div>
+          <h2 id="browse-surplus-title">Surplus &amp; Dead Stock</h2>
+          <p>Browse surplus or unused equipment, excess inventory, and dead stock.</p>
+        </div>
+        <button
+          type="button"
+          className="button button-dark"
+          onClick={() => setFilters(current => ({
+            ...current,
+            category: '',
+            inventoryCondition: 'surplus',
+          }))}
+        >
+          View surplus listings
+        </button>
+      </section>
 
       {/* TOOLBAR */}
       <div className="browse-toolbar">
@@ -232,7 +290,7 @@ export default function Browse({
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search by name, brand, model or location"
+            placeholder="Search equipment, brand, OEM part number or location"
           />
         </div>
 
@@ -258,15 +316,19 @@ export default function Browse({
 
 
         {/* SORT */}
-        <div className="sort-select">
+        <label className="sort-select">
           Sort by:
-
-          <strong>
-            Recently added
-          </strong>
-
-          <ChevronDown size={15} />
-        </div>
+          <select
+            value={sort}
+            onChange={event => setSort(event.target.value)}
+            aria-label="Sort equipment listings"
+          >
+            <option value="newest">Newest listings</option>
+            <option value="price-asc" disabled={!hasPricedListings}>Price: low to high</option>
+            <option value="price-desc" disabled={!hasPricedListings}>Price: high to low</option>
+          </select>
+          <ChevronDown size={15} aria-hidden="true" />
+        </label>
 
       </div>
 
@@ -380,6 +442,33 @@ export default function Browse({
           </label>
 
 
+          {/* INVENTORY CONDITION */}
+          <label className="filter-control">
+            Inventory condition
+            <select
+              name="inventoryCondition"
+              value={filters.inventoryCondition}
+              onChange={updateFilter}
+            >
+              <option value="">Any inventory condition</option>
+              <option value="surplus">Surplus &amp; dead stock</option>
+              {inventoryConditions.map(condition => (
+                <option key={condition} value={condition}>{condition}</option>
+              ))}
+            </select>
+          </label>
+
+          {/* OEM PART NUMBER */}
+          <label className="filter-control">
+            OEM part number
+            <input
+              name="oemPartNumber"
+              value={filters.oemPartNumber}
+              onChange={updateFilter}
+              placeholder="Enter part number"
+            />
+          </label>
+
           {/* PRICE */}
           <label className="filter-control">
             Price range
@@ -488,9 +577,9 @@ export default function Browse({
 
                 <span>
                   <strong>
-                    {filtered.length}
+                    {loading ? '—' : filtered.length}
                   </strong>{' '}
-                  verified listings
+                  {loading ? 'loading listings' : 'matching listings'}
                 </span>
 
                 <span className="view-toggle">
@@ -520,9 +609,13 @@ export default function Browse({
                   ))}
 
                 </div>
+              ) : loading ? (
+                <p className="empty-state" role="status">
+                  Loading equipment listings…
+                </p>
               ) : (
                 <p className="empty-state">
-                  No published equipment matches your search.
+                  No verified equipment matches these search and filter options.
                 </p>
               )}
 
