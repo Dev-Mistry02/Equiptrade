@@ -1,4 +1,5 @@
 import {
+  ArrowRight,
   Boxes,
   ChevronDown,
   Filter,
@@ -14,6 +15,8 @@ import { categories, inventoryConditions } from '../data'
 import { getCachedListings, setCachedListings } from '../marketplaceCache'
 import { isPublicQualityListing } from '../listingQuality'
 import { toProductSlug } from '../productSlug'
+
+const exampleSearches = ['DG sets', 'Transformers', 'Industrial motors', 'MRO spares']
 
 function getBrowseCacheKey(search, filters) {
   return `browse:${JSON.stringify({ search, filters })}`
@@ -614,9 +617,50 @@ export default function Browse({
                   Loading equipment listings…
                 </p>
               ) : (
-                <p className="empty-state">
-                  No verified equipment matches these search and filter options.
-                </p>
+                <section className="browse-no-results" aria-labelledby="browse-no-results-title">
+                  <h2 id="browse-no-results-title">No matching equipment found</h2>
+                  <p>
+                    {search.trim()
+                      ? `We couldn’t find a verified listing for “${search.trim()}”.`
+                      : 'No verified equipment matches these search and filter options.'}
+                  </p>
+                  <div className="browse-search-examples" aria-label="Suggested searches">
+                    <span>Try searching for:</span>
+                    {exampleSearches.map(example => (
+                      <button
+                        type="button"
+                        key={example}
+                        onClick={() => {
+                          setSearch(example)
+                          clearFilters()
+                          setSort('newest')
+                        }}
+                      >
+                        {example}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="browse-no-results-actions">
+                    {activeFilters > 0 && (
+                      <button type="button" className="button button-outline" onClick={clearFilters}>
+                        Clear filters
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="button button-dark"
+                      onClick={() => navigate('contact', {
+                        equipmentSearch:
+                          search.trim() ||
+                          filters.oemPartNumber ||
+                          filters.category ||
+                          'industrial equipment',
+                      })}
+                    >
+                      Ask us to help source it <ArrowRight size={16} />
+                    </button>
+                  </div>
+                </section>
               )}
 
             </>

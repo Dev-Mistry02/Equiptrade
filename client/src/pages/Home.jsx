@@ -36,6 +36,8 @@ const homeSlides = [
   },
 ]
 
+const exampleSearches = ['DG sets', 'Transformers', 'Industrial motors', 'MRO spares']
+
 const HomeSearch = memo(function HomeSearch({ initialSearch, navigate, placeholder, setSearch }) {
   const [query, setQuery] = useState(initialSearch)
 
@@ -46,16 +48,33 @@ const HomeSearch = memo(function HomeSearch({ initialSearch, navigate, placehold
   }
 
   return (
-    <form className="hero-search" onSubmit={submitSearch}>
-      <Search size={19} />
-      <input
-        value={query}
-        onChange={event => setQuery(event.target.value)}
-        placeholder={placeholder}
-        aria-label="Search equipment"
-      />
-      <button type="submit">Search equipment <ArrowRight size={16} /></button>
-    </form>
+    <>
+      <form className="hero-search" onSubmit={submitSearch}>
+        <Search size={19} />
+        <input
+          value={query}
+          onChange={event => setQuery(event.target.value)}
+          placeholder={placeholder}
+          aria-label="Search equipment"
+        />
+        <button type="submit">Search equipment <ArrowRight size={16} /></button>
+      </form>
+      <div className="home-search-examples" aria-label="Example searches">
+        {/* <span>Try:</span> */}
+        {exampleSearches.map(example => (
+          <button
+            type="button"
+            key={example}
+            onClick={() => {
+              setSearch(example)
+              navigate('browse')
+            }}
+          >
+            {example}
+          </button>
+        ))}
+      </div>
+    </>
   )
 })
 

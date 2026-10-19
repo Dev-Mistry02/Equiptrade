@@ -122,29 +122,35 @@ function isPublicPath(pathname) {
   )
 }
 
-function hasAcceptedCookieConsent() {
+function hasDismissedCookieNotice() {
   return document.cookie
     .split(';')
-    .some(cookie => cookie.trim() === 'equiptrade_cookie_consent=accepted')
+    .some(cookie => {
+      const value = cookie.trim()
+      return (
+        value === 'equiptrade_cookie_notice=dismissed' ||
+        value === 'equiptrade_cookie_consent=accepted'
+      )
+    })
 }
 
-function CookieNotice({ onAccept }) {
+function CookieNotice({ onDismiss }) {
   return (
     <aside
       className="cookie-notice"
-      role="dialog"
-      aria-label="Cookie notice"
+      role="note"
+      aria-label="Essential cookie information"
       aria-describedby="cookie-notice-message"
     >
       <div className="cookie-notice-copy">
-        <strong>We use essential cookies</strong>
+        <strong>Essential cookies</strong>
         <p id="cookie-notice-message">
-          Cookies keep your account signed in and help protect your session.
-          Accept to dismiss this notice.
+          We use cookies to keep your account signed in and help protect your
+          session. They’re needed for the site to work.
         </p>
       </div>
-      <button type="button" onClick={onAccept}>
-        Accept cookies
+      <button type="button" onClick={onDismiss}>
+        Got it
       </button>
     </aside>
   )
@@ -258,6 +264,7 @@ function App() {
   const [search, setSearch] = useState(
     () => new URLSearchParams(window.location.search).get('search') || ''
   )
+  const [contactEquipmentSearch, setContactEquipmentSearch] = useState('')
   const [selected, setSelected] = useState(null)
   const [browseFilters, setBrowseFilters] = useState(() => {
     const params = new URLSearchParams(window.location.search)
@@ -277,8 +284,8 @@ function App() {
     return filterNames.some(name => filters[name]) ? filters : null
   })
   const [profileOpen, setProfileOpen] = useState(false)
-  const [cookieConsentAccepted, setCookieConsentAccepted] = useState(
-    hasAcceptedCookieConsent
+  const [cookieNoticeDismissed, setCookieNoticeDismissed] = useState(
+    hasDismissedCookieNotice
   )
   const authRequestInFlight = useRef(false)
 
@@ -568,11 +575,11 @@ function App() {
     )
   }
 
-  const acceptCookies = () => {
+  const dismissCookieNotice = () => {
     const secure = window.location.protocol === 'https:' ? '; Secure' : ''
     document.cookie =
-      `equiptrade_cookie_consent=accepted; Max-Age=15552000; Path=/; SameSite=Lax${secure}`
-    setCookieConsentAccepted(true)
+      `equiptrade_cookie_notice=dismissed; Max-Age=15552000; Path=/; SameSite=Lax${secure}`
+    setCookieNoticeDismissed(true)
   }
 
   const sendOtp = async event => {
@@ -740,6 +747,13 @@ function App() {
     if (nextPage === 'browse') {
       setBrowseFilters(options.filters || {})
     }
+    if (nextPage === 'contact') {
+      setContactEquipmentSearch(
+        typeof options.equipmentSearch === 'string'
+          ? options.equipmentSearch.trim().slice(0, 160)
+          : ''
+      )
+    }
 
     if (nextPage === 'product-detail') {
       const slug =
@@ -847,8 +861,8 @@ function App() {
     return (
       <>
         <GearLoader />
-        {!cookieConsentAccepted && (
-          <CookieNotice onAccept={acceptCookies} />
+        {!cookieNoticeDismissed && (
+          <CookieNotice onDismiss={dismissCookieNotice} />
         )}
       </>
     )
@@ -868,8 +882,8 @@ function App() {
             window.dispatchEvent(new Event('equiptrade:session-changed'))
           }}
         />
-        {!cookieConsentAccepted && (
-          <CookieNotice onAccept={acceptCookies} />
+        {!cookieNoticeDismissed && (
+          <CookieNotice onDismiss={dismissCookieNotice} />
         )}
       </>
     )
@@ -897,8 +911,8 @@ function App() {
             </div>
           )}
         </div>
-        {!cookieConsentAccepted && (
-          <CookieNotice onAccept={acceptCookies} />
+        {!cookieNoticeDismissed && (
+          <CookieNotice onDismiss={dismissCookieNotice} />
         )}
       </>
     )
@@ -1157,7 +1171,12 @@ function App() {
 
         {page === 'legal-info' && <LegalInfoPage navigate={navigate} />}
 
-        {page === 'contact' && <ContactPage navigate={navigate} />}
+        {page === 'contact' && (
+          <ContactPage
+            navigate={navigate}
+            equipmentSearch={contactEquipmentSearch}
+          />
+        )}
 
         {page === 'browse' && (
           <BrowsePage
@@ -1214,8 +1233,8 @@ function App() {
         </div>
       )}
 
-      {!cookieConsentAccepted && (
-        <CookieNotice onAccept={acceptCookies} />
+      {!cookieNoticeDismissed && (
+        <CookieNotice onDismiss={dismissCookieNotice} />
       )}
 
       {verificationOpen && sessionInitialized && !verified && (

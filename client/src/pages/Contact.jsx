@@ -22,14 +22,17 @@ const contactDetails = [
   },
 ]
 
-export default function Contact({ navigate }) {
+export default function Contact({ navigate, equipmentSearch = '' }) {
+  const equipmentRequest = equipmentSearch.trim().slice(0, 160)
   const [form, setForm] = useState({
     name: '',
     email: '',
     phone: '',
     company: '',
-    subject: '',
-    message: '',
+    subject: equipmentRequest ? `Equipment request: ${equipmentRequest}` : '',
+    message: equipmentRequest
+      ? `I’m looking for ${equipmentRequest}. Please let me know if you can help source it.`
+      : '',
   })
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState('')
