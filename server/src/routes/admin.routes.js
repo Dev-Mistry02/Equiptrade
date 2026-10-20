@@ -29,7 +29,17 @@ router.get('/leads', async (req, res) => {
     if (req.query.search) {
       const escapedSearch = String(req.query.search).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
       if (escapedSearch) {
-        query.$or = ['leadId', 'name', 'email', 'phone', 'company', 'subject', 'message']
+        query.$or = [
+          'leadId',
+          'name',
+          'email',
+          'phone',
+          'company',
+          'equipmentName',
+          'sellerEmail',
+          'subject',
+          'message',
+        ]
           .map(field => ({ [field]: new RegExp(escapedSearch, 'i') }))
       }
     }

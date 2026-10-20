@@ -11,6 +11,10 @@ const leadSchema = new mongoose.Schema({
   email: { type: String, required: true, trim: true, lowercase: true, maxlength: 254 },
   phone: { type: String, trim: true, maxlength: 30, default: '' },
   company: { type: String, trim: true, maxlength: 160, default: '' },
+  equipmentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Equipment', index: true },
+  equipmentName: { type: String, trim: true, maxlength: 200, default: '' },
+  sellerEmail: { type: String, trim: true, lowercase: true, maxlength: 254, default: '' },
+  sellerMobileNumber: { type: String, trim: true, maxlength: 30, default: '' },
   subject: { type: String, required: true, trim: true, maxlength: 200 },
   message: { type: String, required: true, trim: true, maxlength: 5000 },
   status: {

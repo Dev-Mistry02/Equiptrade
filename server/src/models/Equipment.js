@@ -19,6 +19,13 @@ const equipmentSchema = new mongoose.Schema({
   },
   usage: String,
   price: Number,
+  rentalTimeUnit: {
+    type: String,
+    enum: ['Hour', 'Day', 'Week', 'Month'],
+    required: function () {
+      return this.listingType === 'rental'
+    },
+  },
   location: String,
   description: String,
   images: [{
@@ -41,6 +48,7 @@ equipmentSchema.index({ status: 1, category: 1, createdAt: -1 })
 equipmentSchema.index({ status: 1, inventoryCondition: 1, createdAt: -1 })
 equipmentSchema.index({ status: 1, condition: 1, createdAt: -1 })
 equipmentSchema.index({ status: 1, price: 1, createdAt: -1 })
+equipmentSchema.index({ seller: 1, createdAt: -1 })
 equipmentSchema.index({ status: 1, createdAt: -1 })
 
 export default mongoose.model('Equipment', equipmentSchema)

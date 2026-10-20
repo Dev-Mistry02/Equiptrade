@@ -113,6 +113,11 @@ const equipmentSchema = z.object({
       )
   ),
 
+  rentalTimeUnit: z.preprocess(
+    value => value === '' ? undefined : value,
+    z.enum(['Hour', 'Day', 'Week', 'Month']).optional()
+  ),
+
   location: z
     .string()
     .trim()
@@ -125,6 +130,14 @@ const equipmentSchema = z.object({
       10,
       'Description must be at least 10 characters.'
     ),
+}).superRefine((data, context) => {
+  if (data.listingType === 'rental' && !data.rentalTimeUnit) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Choose a rental time unit.',
+      path: ['rentalTimeUnit'],
+    })
+  }
 })
 
 export default function Sell({
@@ -168,6 +181,7 @@ export default function Sell({
     condition: '',
     inventoryCondition: '',
     price: '',
+    rentalTimeUnit: '',
     location: '',
     description: '',
   })
@@ -180,16 +194,20 @@ export default function Sell({
   const update = event => {
     setError('')
 
-    setForm({
-      ...form,
-      [event.target.name]: event.target.value,
-    })
+    const { name, value } = event.target
+    setForm(current => ({
+      ...current,
+      [name]: value,
+      ...(name === 'listingType' && value === 'sale'
+        ? { rentalTimeUnit: '' }
+        : {}),
+    }))
   }
 
   // =========================================================
   // SELECT IMAGES
-  // MINIMUM 3
-  // MAXIMUM 4
+  // MINIMUM 1
+  // MAXIMUM 3
   // =========================================================
 
   const selectImages = event => {
@@ -200,12 +218,12 @@ export default function Sell({
     if (!selectedFiles.length) return
 
     // -------------------------------------------------------
-    // MAXIMUM 4 IMAGES
+    // MAXIMUM 3 IMAGES
     // -------------------------------------------------------
 
-    if (images.length + selectedFiles.length > 4) {
+    if (images.length + selectedFiles.length > 3) {
       setError(
-        `You can upload a maximum of 4 different images. You currently have ${images.length} image${images.length !== 1 ? 's' : ''
+        `You can upload a maximum of 3 different images. You currently have ${images.length} image${images.length !== 1 ? 's' : ''
         } selected.`
       )
 
@@ -347,15 +365,15 @@ export default function Sell({
 
       // -----------------------------------------------------
       // VALIDATE IMAGE COUNT
-      // MUST BE 3 OR 4
+      // MUST BE 1 TO 3
       // -----------------------------------------------------
 
       if (
-        images.length < 3 ||
-        images.length > 4
+        images.length < 1 ||
+        images.length > 3
       ) {
         setError(
-          `Please upload 3 to 4 different equipment images. Currently ${images.length} image${images.length !== 1 ? 's' : ''
+          `Please upload 1 to 3 different equipment images. Currently ${images.length} image${images.length !== 1 ? 's' : ''
           } selected.`
         )
 
@@ -442,6 +460,9 @@ export default function Sell({
           'year',
           'condition',
           'price',
+          ...(form.listingType === 'rental'
+            ? ['rentalTimeUnit']
+            : []),
           'location',
         ]
         : ['description']
@@ -466,11 +487,11 @@ export default function Sell({
 
     if (
       step === 2 &&
-      (images.length < 3 ||
-        images.length > 4)
+      (images.length < 1 ||
+        images.length > 3)
     ) {
       setError(
-        `Compulsory: Upload 3 to 4 different images (${images.length}/4 selected).`
+        `Compulsory: Upload 1 to 3 different images (${images.length}/3 selected).`
       )
 
       return
@@ -785,8 +806,8 @@ export default function Sell({
                 {/* Price */}
                 <label>
                   {form.listingType === 'rental'
-                    ? 'Rental price'
-                    : 'Expected sale price'}
+                    ? 'Price / time'
+                    : 'Price'}
 
                   <input
                     type="number"
@@ -797,6 +818,22 @@ export default function Sell({
                     min="1"
                     required
                   />
+
+                  {form.listingType === 'rental' && (
+                    <select
+                      name="rentalTimeUnit"
+                      value={form.rentalTimeUnit}
+                      onChange={update}
+                      aria-label="Rental price time unit"
+                      required
+                    >
+                      <option value="">Select time unit</option>
+                      <option value="Hour">Per hour</option>
+                      <option value="Day">Per day</option>
+                      <option value="Week">Per week</option>
+                      <option value="Month">Per month</option>
+                    </select>
+                  )}
                 </label>
 
                 {/* Location */}
@@ -891,10 +928,10 @@ export default function Sell({
                   PNG, JPG or WEBP up to
                   10MB each ·{' '}
                   <b>
-                    Compulsory: 3–4
+                    Compulsory: 1–3
                     different images
                   </b>{' '}
-                  · Maximum 4
+                  · Maximum 3
                 </span>
 
                 {/* IMAGE COUNT */}
@@ -905,16 +942,16 @@ export default function Sell({
                     fontSize: 12,
                     fontWeight: 700,
                     color:
-                      images.length >= 3 &&
-                        images.length <= 4
+                      images.length >= 1 &&
+                        images.length <= 3
                         ? '#277258'
                         : '#b44e4e',
                   }}
                 >
-                  {images.length >= 3 &&
-                    images.length <= 4
-                    ? `✓ ${images.length}/4 different images added`
-                    : `* Compulsory: Add 3–4 different images (${images.length}/4)`}
+                  {images.length >= 1 &&
+                    images.length <= 3
+                    ? `✓ ${images.length}/3 different images added`
+                    : `* Compulsory: Add 1–3 different images (${images.length}/3)`}
                 </div>
 
                 {/* CHOOSE IMAGE BUTTON */}
@@ -922,15 +959,15 @@ export default function Sell({
                 <button
                   type="button"
                   className="button button-outline"
-                  disabled={images.length >= 4}
+                  disabled={images.length >= 3}
                   onClick={event => {
                     event.stopPropagation()
 
                     if (
-                      images.length >= 4
+                      images.length >= 3
                     ) {
                       setError(
-                        'Maximum 4 images are allowed.'
+                        'Maximum 3 images are allowed.'
                       )
 
                       return
@@ -939,8 +976,8 @@ export default function Sell({
                     fileInputRef.current?.click()
                   }}
                 >
-                  {images.length >= 4
-                    ? 'Maximum 4 Images'
+                  {images.length >= 3
+                    ? 'Maximum 3 Images'
                     : 'Choose images'}
                 </button>
               </div>
@@ -1048,7 +1085,9 @@ export default function Sell({
                     )
                       ? `₹${formattedPrice.toLocaleString(
                         'en-IN'
-                      )}`
+                      )}${form.listingType === 'rental' && form.rentalTimeUnit
+                        ? ` / ${form.rentalTimeUnit}`
+                        : ''}`
                       : 'Price on request'}
                   </p>
 

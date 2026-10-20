@@ -2,6 +2,21 @@ import { ArrowRight, BadgeCheck, Building2, Heart } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { isListingSaved, savedListingsChangedEvent } from '../savedListings'
 
+export function formatEquipmentPrice(item, fallback = 'Price on request') {
+  if (
+    !Number.isFinite(Number(item.price)) ||
+    item.price === null ||
+    item.price === ''
+  ) {
+    return fallback
+  }
+
+  const price = `₹${Number(item.price).toLocaleString('en-IN')}`
+  return item.listingType === 'rental' && item.rentalTimeUnit
+    ? `${price} / ${item.rentalTimeUnit}`
+    : price
+}
+
 function getResponsiveImageSource(image, width) {
   try {
     const url = new URL(image)
@@ -138,9 +153,7 @@ export function EquipmentCard({ item, onClick, onSave, imageSizes }) {
 
         <div className="equipment-footer">
           <strong>
-            {Number.isFinite(Number(item.price)) && item.price !== null && item.price !== ''
-              ? `₹${Number(item.price).toLocaleString('en-IN')}`
-              : 'Contact for Price'}
+            {formatEquipmentPrice(item, 'Contact for Price')}
           </strong>
           {item.location && (
             <span>

@@ -2,12 +2,15 @@ import { Router } from 'express'
 import Equipment from '../models/Equipment.js'
 import mongoose from 'mongoose'
 import { requireUser } from '../middleware/userAuth.js'
+import Lead from '../models/Lead.js'
 import {
   sendBuyerEnquiryEmails,
   sendListingSubmissionEmail,
 } from '../services/mailer.js'
 
 const router = Router()
+const MONTHLY_LISTING_LIMIT = 10
+const LISTING_LIMIT_WINDOW_MS = 30 * 24 * 60 * 60 * 1000
 const PUBLIC_LISTING_STATUSES = ['approved', 'published']
 const PUBLIC_LISTING_FILTER = {
   status: { $in: PUBLIC_LISTING_STATUSES },
@@ -188,6 +191,7 @@ router.get('/home', async (_req, res) => {
                 verificationStatus: 1,
                 listingType: 1,
                 price: 1,
+                rentalTimeUnit: 1,
                 location: 1,
                 seller: {
                   name: '$seller.name',
@@ -356,31 +360,51 @@ router.post('/:id/enquiries', requireUser, async (req, res) => {
     const listing = await Equipment.findOne({
       _id: id,
       ...PUBLIC_LISTING_FILTER,
-    }).populate('seller', 'name email')
+    }).populate('seller', 'name email mobileNumber')
 
     if (!listing) {
       return res.status(404).json({ message: 'Equipment listing not found.' })
     }
 
-    if (!listing.seller?.email) {
-      return res.status(409).json({
-        message: 'The seller has no email address available for enquiries.',
-      })
-    }
-
-    const emailResults = await sendBuyerEnquiryEmails({
-      sellerEmail: listing.seller.email,
-      buyerEmail: email,
-      buyerName: name,
-      buyerMobileNumber: mobileNumber,
+    const lead = await Lead.create({
+      name,
+      email,
+      phone: mobileNumber,
+      equipmentId: listing._id,
+      equipmentName: listing.name.slice(0, 200),
+      sellerEmail: listing.seller?.email || '',
+      sellerMobileNumber: listing.seller?.mobileNumber || '',
+      subject: `Buyer enquiry: ${listing.name}`.slice(0, 200),
       message,
-      equipmentName: listing.name,
     })
 
+    let emailResults = {
+      sellerEmailSent: false,
+      buyerConfirmationSent: false,
+      sellerError: listing.seller?.email ? null : 'Seller email is not available.',
+      buyerError: null,
+    }
+
+    if (listing.seller?.email) {
+      try {
+        emailResults = await sendBuyerEnquiryEmails({
+          sellerEmail: listing.seller.email,
+          buyerEmail: email,
+          buyerName: name,
+          buyerMobileNumber: mobileNumber,
+          message,
+          equipmentName: listing.name,
+        })
+      } catch (error) {
+        emailResults.sellerError = error.message
+        emailResults.buyerError = error.message
+      }
+    }
+
     if (!emailResults.sellerEmailSent) {
-      console.error('Failed to email buyer enquiry to seller:', emailResults.sellerError)
-      return res.status(502).json({
-        message: 'Your enquiry could not be delivered to the seller. Please try again.',
+      console.error('Buyer enquiry saved but seller email delivery failed:', {
+        leadId: lead.leadId,
+        sellerError: emailResults.sellerError,
       })
     }
 
@@ -388,14 +412,18 @@ router.post('/:id/enquiries', requireUser, async (req, res) => {
       console.error('Failed to send buyer enquiry confirmation:', emailResults.buyerError)
     }
 
-    res.status(200).json({
-      message: 'Your enquiry was sent to the seller.',
+    return res.status(201).json({
+      message: emailResults.sellerEmailSent
+        ? 'Your enquiry was sent to the seller.'
+        : 'Your enquiry was saved. Our team will follow up because the seller could not be notified by email.',
+      leadId: lead.leadId,
+      sellerNotified: emailResults.sellerEmailSent,
       confirmationEmailSent: emailResults.buyerConfirmationSent,
     })
   } catch (error) {
     console.error('Failed to send buyer enquiry:', error)
-    res.status(502).json({
-      message: 'Your enquiry could not be emailed. Please check the mail configuration and try again.',
+    res.status(500).json({
+      message: 'Your enquiry could not be saved. Please try again.',
     })
   }
 })
@@ -459,7 +487,8 @@ router.post('/', requireUser, async (req, res) => {
 
     if (
       !Array.isArray(req.body.images) ||
-      req.body.images.length < 3 ||
+      req.body.images.length < 1 ||
+      req.body.images.length > 3 ||
       req.body.images.some(
         image =>
           typeof image !== 'string' ||
@@ -467,7 +496,7 @@ router.post('/', requireUser, async (req, res) => {
       )
     ) {
       return res.status(400).json({
-        message: 'Add at least 3 valid Cloudinary image URLs.',
+        message: 'Add 1 to 3 valid Cloudinary image URLs.',
       })
     }
 
@@ -480,10 +509,23 @@ router.post('/', requireUser, async (req, res) => {
       })
     }
 
+    const sellerId = req.user.userId || req.user.id
+    const windowStart = new Date(Date.now() - LISTING_LIMIT_WINDOW_MS)
+    const recentListingCount = await Equipment.countDocuments({
+      seller: sellerId,
+      createdAt: { $gte: windowStart },
+    })
+
+    if (recentListingCount >= MONTHLY_LISTING_LIMIT) {
+      return res.status(429).json({
+        message: 'You can submit a maximum of 10 equipment listings in any 30-day period.',
+      })
+    }
+
     const listingData = {
       ...req.body,
       listingType,
-      seller: req.user.id,
+      seller: sellerId,
       status: 'pending',
       verificationStatus: 'Pending Verification',
     }

@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useState } from 'react'
 import { LoaderCircle, ShieldCheck, Trash2, X, RefreshCw } from 'lucide-react'
 import { api } from '../api'
+import { formatEquipmentPrice } from '../components/MarketplaceComponents'
 import LeadsDashboard from './LeadsDashboard'
 
 export default function Admin({ notify }) {
@@ -644,13 +645,7 @@ export default function Admin({ notify }) {
                     </td>
 
                     <td data-label="Asking price">
-
-                      {item.price
-                        ? `₹${Number(
-                            item.price
-                          ).toLocaleString('en-IN')}`
-                        : 'Price on request'}
-
+                      {formatEquipmentPrice(item)}
                     </td>
 
 
@@ -887,13 +882,7 @@ export default function Admin({ notify }) {
 
                               <span>
                                 <b>Asking price</b>
-                                {item.price
-                                  ? `₹${Number(
-                                      item.price
-                                    ).toLocaleString(
-                                      'en-IN'
-                                    )}`
-                                  : 'Price on request'}
+                                {formatEquipmentPrice(item)}
                               </span>
 
                               <span>
@@ -1094,13 +1083,7 @@ export default function Admin({ notify }) {
 
                   <span>
                     <b>Asking price</b>
-                    {expandedItem.price
-                      ? `₹${Number(
-                          expandedItem.price
-                        ).toLocaleString(
-                          'en-IN'
-                        )}`
-                      : 'Price on request'}
+                    {formatEquipmentPrice(expandedItem)}
                   </span>
 
                   <span>

@@ -25,7 +25,10 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api'
-import { EquipmentCard } from '../components/MarketplaceComponents'
+import {
+  EquipmentCard,
+  formatEquipmentPrice,
+} from '../components/MarketplaceComponents'
 import {
   getCachedListings,
   getCachedProduct,
@@ -81,6 +84,7 @@ export default function ProductDetail({
   const [enquiryModal, setEnquiryModal] = useState(false)
   const [enquirySending, setEnquirySending] = useState(false)
   const [enquiryError, setEnquiryError] = useState('')
+  const [sellerNotified, setSellerNotified] = useState(false)
   const [confirmationEmailSent, setConfirmationEmailSent] = useState(false)
   const [ratingModal, setRatingModal] = useState(false)
   const [ratingPending, setRatingPending] = useState(false)
@@ -347,6 +351,8 @@ export default function ProductDetail({
 
   const openEnquiry = () => {
     setEnquiryError('')
+    setSellerNotified(false)
+    setConfirmationEmailSent(false)
     setEnquiryModal(true)
   }
 
@@ -360,16 +366,19 @@ export default function ProductDetail({
         mobileNumber: enquiryForm.mobileNumber,
         message: enquiryForm.message,
       })
+      setSellerNotified(response.sellerNotified ?? true)
       setConfirmationEmailSent(response.confirmationEmailSent)
       setEnquiryModal(false)
       setServiceRating(0)
       setFeedbackMessage('')
       setFeedbackError('')
-      setRatingPending(true)
+      setRatingPending(response.sellerNotified ?? true)
       notify?.(
-        response.confirmationEmailSent
-          ? 'Your enquiry was sent to the seller.'
-          : 'Your enquiry was sent, but the confirmation email could not be sent.'
+        (response.sellerNotified ?? true)
+          ? response.confirmationEmailSent
+            ? 'Your enquiry was sent to the seller.'
+            : 'Your enquiry was sent to the seller, but the confirmation email could not be sent.'
+          : 'Your enquiry was saved. Our team will follow up because the seller could not be notified by email.'
       )
     } catch (error) {
       setEnquiryError(
@@ -490,9 +499,7 @@ export default function ProductDetail({
     )
   }
 
-  const formattedPrice = item.price
-    ? `₹${Number(item.price).toLocaleString('en-IN')}`
-    : 'Price on request'
+  const formattedPrice = formatEquipmentPrice(item)
 
   const listingRefId = `EQP-${(item._id || item.id || '2026')
     .toString()
@@ -677,7 +684,7 @@ export default function ProductDetail({
           <div className="pd-price-box">
             <div>
               <span className="pd-price-label">
-                {item.listingType === 'rental' ? 'Rental price' : 'Sale price'}
+                {item.listingType === 'rental' ? 'Price / time' : 'Price'}
               </span>
               <div className="pd-price-amount">{formattedPrice}</div>
             </div>
@@ -1147,9 +1154,11 @@ export default function ProductDetail({
               <span className="pd-rating-kicker"><Sparkles size={14} /> ENQUIRY SENT</span>
               <h3 id="pd-rating-title">How did we do?</h3>
               <p>
-                {confirmationEmailSent
-                  ? 'Your enquiry reached the seller. Take a moment to rate your EquipTrade experience.'
-                  : 'Your enquiry reached the seller. We could not send a confirmation email, but you can still rate your experience.'}
+                {!sellerNotified
+                  ? 'Your enquiry was saved, but the seller could not be notified by email. Our team will follow up with you.'
+                  : confirmationEmailSent
+                    ? 'Your enquiry reached the seller. Take a moment to rate your EquipTrade experience.'
+                    : 'Your enquiry reached the seller. We could not send a confirmation email, but you can still rate your experience.'}
               </p>
             </div>
 

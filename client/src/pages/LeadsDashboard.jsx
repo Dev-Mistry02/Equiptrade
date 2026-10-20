@@ -86,7 +86,7 @@ export default function LeadsDashboard({ notify }) {
         <div>
           <span className="eyebrow">Contact enquiries</span>
           <h2>Lead management</h2>
-          <p>Review enquiries submitted through the Contact Us form.</p>
+          <p>Review Contact Us messages and equipment enquiries.</p>
         </div>
         <button type="button" className="button button-outline" onClick={loadLeads} disabled={loading}>
           Refresh leads
@@ -107,7 +107,7 @@ export default function LeadsDashboard({ notify }) {
           <input
             value={searchDraft}
             onChange={event => setSearchDraft(event.target.value)}
-            placeholder="Search ID, name, email, company, subject…"
+            placeholder="Search ID, name, email, company, equipment, seller…"
           />
           <button type="submit">Search</button>
         </label>
@@ -173,7 +173,13 @@ export default function LeadsDashboard({ notify }) {
                   <div><dt>Email</dt><dd><a href={`mailto:${lead.email}`}>{lead.email}</a></dd></div>
                   <div><dt>Phone</dt><dd>{lead.phone || 'Not provided'}</dd></div>
                   <div><dt>Company</dt><dd>{lead.company || 'Not provided'}</dd></div>
-                  <div><dt>Subject / equipment</dt><dd>{lead.subject}</dd></div>
+                  <div><dt>Equipment</dt><dd>{lead.equipmentName || lead.subject}</dd></div>
+                  {lead.sellerEmail && (
+                    <div><dt>Seller email</dt><dd><a href={`mailto:${lead.sellerEmail}`}>{lead.sellerEmail}</a></dd></div>
+                  )}
+                  {lead.sellerMobileNumber && (
+                    <div><dt>Seller phone</dt><dd><a href={`tel:${lead.sellerMobileNumber}`}>{lead.sellerMobileNumber}</a></dd></div>
+                  )}
                   <div><dt>Submitted</dt><dd>{formatDate(lead.createdAt)}</dd></div>
                   <div><dt>Enquiry ID</dt><dd>{lead.leadId}</dd></div>
                 </dl>
