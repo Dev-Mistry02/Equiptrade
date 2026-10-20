@@ -8,7 +8,6 @@ import { sendListingStatusEmail } from '../services/mailer.js'
 import { requireAdmin } from '../middleware/adminAuth.js'
 
 const router = Router()
-const PLACEHOLDER_NAME_PATTERN = /(^|[\s_-])(hell|test|demo|dummy|sample|placeholder|asdf|qwerty)([\s_-]|$)/i
 
 router.use(requireAdmin)
 
@@ -111,21 +110,6 @@ router.get('/submissions', async (_req, res) => {
     res.set('Pragma', 'no-cache')
     res.set('Expires', '0')
 
-    await Equipment.updateMany(
-      {
-        name: PLACEHOLDER_NAME_PATTERN,
-        isQualityHold: { $ne: true },
-        isQualityReviewed: { $ne: true },
-      },
-      {
-        $set: {
-          isQualityHold: true,
-          isActive: false,
-          qualityReviewReason: 'Potential development or placeholder listing; review before republishing.',
-        },
-      }
-    )
-
     const submissions = await Equipment
       .find()
       .sort({ createdAt: -1 })
@@ -135,8 +119,7 @@ router.get('/submissions', async (_req, res) => {
     res.status(200).json(submissions.map(item => ({
       ...item,
       qualityReviewFlag: Boolean(
-        item.isQualityHold ||
-        (!item.isQualityReviewed && PLACEHOLDER_NAME_PATTERN.test(item.name || ''))
+        item.isQualityHold
       ),
     })))
 

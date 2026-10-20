@@ -9,7 +9,6 @@ import {
 
 const router = Router()
 const PUBLIC_LISTING_STATUSES = ['approved', 'published']
-const PLACEHOLDER_NAME_PATTERN = /(^|[\s_-])(hell|test|demo|dummy|sample|placeholder|asdf|qwerty)([\s_-]|$)/i
 const PUBLIC_LISTING_FILTER = {
   status: { $in: PUBLIC_LISTING_STATUSES },
   isActive: { $ne: false },
@@ -19,7 +18,6 @@ const PUBLIC_LISTING_FILTER = {
     $type: 'string',
     $ne: '',
     $regex: /\S/,
-    $not: PLACEHOLDER_NAME_PATTERN,
   },
   category: { $type: 'string', $ne: '', $regex: /\S/ },
   'images.0': /^https:\/\/res\.cloudinary\.com\/[^/\s]+\/image\/upload\/.+/,

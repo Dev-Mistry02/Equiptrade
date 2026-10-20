@@ -135,15 +135,16 @@ async function ensureUserIndexes() {
   );
 }
 
-async function restoreListingsHeldByOverbroadDescriptionCheck() {
+async function restoreListingsHeldByAutomaticQualityChecks() {
   const result = await Equipment.updateMany(
     {
       status: { $in: ['approved', 'published'] },
       isQualityHold: true,
-      qualityReviewReason: 'Potential development or placeholder listing details; review before republishing.',
-      name: {
-        $type: 'string',
-        $not: /(^|[\s_-])(hell|test|demo|dummy|sample|placeholder|asdf|qwerty)([\s_-]|$)/i,
+      qualityReviewReason: {
+        $in: [
+          'Potential development or placeholder listing; review before republishing.',
+          'Potential development or placeholder listing details; review before republishing.',
+        ],
       },
     },
     {
@@ -156,7 +157,7 @@ async function restoreListingsHeldByOverbroadDescriptionCheck() {
   );
 
   if (result.modifiedCount > 0) {
-    console.info(`Restored ${result.modifiedCount} approved listing(s) hidden by the previous description check.`);
+    console.info(`Restored ${result.modifiedCount} approved listing(s) hidden by automatic quality checks.`);
   }
 }
 
@@ -182,7 +183,7 @@ async function connectToDatabase() {
       console.log('MongoDB connected successfully.');
 
       await ensureUserIndexes();
-      await restoreListingsHeldByOverbroadDescriptionCheck();
+      await restoreListingsHeldByAutomaticQualityChecks();
 
       console.log('MongoDB indexes verified successfully.');
 
