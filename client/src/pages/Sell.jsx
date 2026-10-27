@@ -45,6 +45,7 @@ const CATEGORY_OPTIONS = [
   'Generators',
   'Printing Equipment',
   'Other',
+  'Dg set',
 ]
 
 const equipmentSchema = z.object({
@@ -853,16 +854,15 @@ export default function Sell({
                 <label>
                   Category
 
-                  <select
+                  <input
                     name="category"
                     value={form.category}
                     onChange={update}
+                    list="category-suggestions"
+                    placeholder="Enter category or select category"
                     required
-                  >
-                    <option value="" disabled>
-                      Select category
-                    </option>
-
+                  />
+                  <datalist id="category-suggestions">
                     {CATEGORY_OPTIONS.map(category => (
                       <option
                         key={category}
@@ -871,9 +871,8 @@ export default function Sell({
                         {category}
                       </option>
                     ))}
-                  </select>
+                  </datalist>
                 </label>
-
               </div>
             </>
           )}
