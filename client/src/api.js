@@ -74,12 +74,14 @@ async function request(path, options = {}) {
   let response
   const { timeoutMs = 15000, ...fetchOptions } = options
 
+  const isGetRequest = !(fetchOptions.method && fetchOptions.method.toUpperCase() !== 'GET')
+
   try {
     const accessToken = getUserAccessToken()
     const isAdminRequest =
       path.startsWith('/admin') || path.startsWith('/auth/admin-')
     const headers = {
-      'Content-Type': 'application/json',
+      ...(isGetRequest ? {} : { 'Content-Type': 'application/json' }),
       ...(accessToken && !isAdminRequest
         ? { Authorization: `Bearer ${accessToken}` }
         : {}),
@@ -90,7 +92,7 @@ async function request(path, options = {}) {
       ...fetchOptions,
       headers,
       credentials: 'include',
-      cache: 'no-store',
+      cache: isGetRequest ? 'default' : 'no-store',
       signal: fetchOptions.signal || AbortSignal.timeout(timeoutMs),
     })
   } catch (error) {
@@ -194,22 +196,6 @@ export const api = {
         ...options,
       })
 
-      if (
-        homeData.listings.length < 4 &&
-        (homeData.totalListings == null ||
-          homeData.totalListings > homeData.listings.length)
-      ) {
-        const listings = await api.getEquipment(undefined, options)
-        return {
-          ...homeData,
-          categories: normalizeCategoryCounts(homeData.categories),
-          listings: listings.slice(0, 4).map(listing => ({
-            ...listing,
-            images: listing.images?.slice(0, 1) || [],
-          })),
-        }
-      }
-
       return {
         ...homeData,
         categories: normalizeCategoryCounts(homeData.categories),
@@ -222,19 +208,13 @@ export const api = {
         throw error
       }
 
-      const listings = await api.getEquipment(undefined, options)
       return {
-        listings: listings.slice(0, 4).map(listing => ({
-          ...listing,
-          images: listing.images?.slice(0, 1) || [],
-        })),
+        listings: [],
         categories: categories.map(category => ({
           ...category,
-          count: listings.filter(listing =>
-            matchesEquipmentCategory(listing, category.name)
-          ).length,
+          count: 0,
         })),
-        totalListings: listings.length,
+        totalListings: 0,
       }
     }
   },
@@ -282,9 +262,7 @@ export const api = {
   },
 
   getEquipmentByIdOrSlug: idOrSlug =>
-    request(`/equipment/${encodeURIComponent(idOrSlug)}`, {
-      timeoutMs: COLD_START_TIMEOUT_MS,
-    }),
+    request(`/equipment/${encodeURIComponent(idOrSlug)}`),
 
   getAdminSubmissions: () =>
     request('/admin/submissions', {

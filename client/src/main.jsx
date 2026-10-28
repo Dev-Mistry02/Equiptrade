@@ -344,15 +344,13 @@ function App() {
     }
 
     syncSession()
-    const interval = setInterval(syncSession, 60 * 1000)
-    window.addEventListener('focus', syncSession)
+    const interval = setInterval(syncSession, 5 * 60 * 1000)
     window.addEventListener('equiptrade:session-changed', syncSession)
     window.addEventListener('equiptrade:session-expired', handleSessionExpired)
 
     return () => {
       active = false
       clearInterval(interval)
-      window.removeEventListener('focus', syncSession)
       window.removeEventListener('equiptrade:session-changed', syncSession)
       window.removeEventListener('equiptrade:session-expired', handleSessionExpired)
     }

@@ -27,6 +27,10 @@ const CONDITION_OPTIONS = [
   'Needs Repair',
 ]
 
+const RENTAL_BLOCKED_CONDITIONS = inventoryConditions.filter(
+  condition => /surplus|unused/i.test(condition)
+)
+
 const CATEGORY_OPTIONS = [
   'CNC & Machine Tools',
   'Construction Equipment',
@@ -199,8 +203,18 @@ export default function Sell({
     setForm(current => ({
       ...current,
       [name]: value,
-      ...(name === 'listingType' && value === 'sale'
-        ? { rentalTimeUnit: '' }
+      ...(name === 'listingType'
+        ? {
+            ...(value === 'sale'
+              ? { rentalTimeUnit: '' }
+              : {}),
+            ...(value === 'rental' &&
+            RENTAL_BLOCKED_CONDITIONS.includes(
+              current.inventoryCondition
+            )
+              ? { inventoryCondition: '' }
+              : {}),
+          }
         : {}),
     }))
   }
@@ -798,9 +812,20 @@ export default function Sell({
                     onChange={update}
                   >
                     <option value="">Select inventory condition</option>
-                    {inventoryConditions.map(condition => (
-                      <option key={condition} value={condition}>{condition}</option>
-                    ))}
+                    {inventoryConditions
+                      .filter(
+                        condition =>
+                          form.listingType !== 'rental' ||
+                          !RENTAL_BLOCKED_CONDITIONS.includes(condition)
+                      )
+                      .map(condition => (
+                        <option
+                          key={condition}
+                          value={condition}
+                        >
+                          {condition}
+                        </option>
+                      ))}
                   </select>
                 </label>
 

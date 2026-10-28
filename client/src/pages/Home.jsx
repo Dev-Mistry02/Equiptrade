@@ -191,15 +191,16 @@ export default function Home({ navigate, setSelected, onSaveListing, search, set
           <div className="hero-visual" key={`visual-${activeSlide}`}>
             <div className="hero-image">
               <picture>
-                <img
-                  src={slide.image}
-                  sizes="(max-width: 1100px) 45vw, 540px"
-                  alt={slide.imageAlt}
-                  width="900"
-                  height="620"
-                  fetchPriority="high"
-                  decoding="async"
-                />
+                  <img
+                    src={slide.image}
+                    sizes="(max-width: 1100px) 45vw, 540px"
+                    alt={slide.imageAlt}
+                    width="900"
+                    height="620"
+                    fetchPriority="high"
+                    decoding="async"
+                    loading="eager"
+                  />
               </picture>
               <div className="image-label"><span className="status-dot" /> The equipment marketplace <strong>{homeData.totalListings}</strong> listings</div>
             </div>

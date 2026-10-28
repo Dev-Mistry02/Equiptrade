@@ -189,19 +189,6 @@ export default function Browse({
     }
   }, [fetchEquipment])
 
-  /*
-   * Automatically refresh marketplace
-   */
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        fetchEquipment({ showLoading: false })
-      }
-    }, 60000)
-
-    return () => clearInterval(interval)
-  }, [fetchEquipment])
-
   const filtered = equipment.filter(isPublicQualityListing)
 
   /*
