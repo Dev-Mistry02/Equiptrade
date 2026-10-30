@@ -228,6 +228,7 @@ function App() {
 
   const [adminAuthenticated, setAdminAuthenticated] =
     useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sessionInitialized, setSessionInitialized] = useState(false)
   const [user, setUser] = useState(null)
 
@@ -893,13 +894,20 @@ function App() {
         <div className="admin-shell">
           <AdminHeader
             navigate={navigate}
-            onLogout={adminLogout}
             theme={theme}
-            onToggleTheme={() => setTheme(current => current === 'dark' ? 'light' : 'dark')}
+            sidebarOpen={sidebarOpen}
+            onToggleSidebar={() => setSidebarOpen(current => !current)}
           />
 
           <Suspense fallback={<PageLoading />}>
-            <AdminPage notify={notify} />
+            <AdminPage
+              notify={notify}
+              theme={theme}
+              sidebarOpen={sidebarOpen}
+              onToggleSidebar={() => setSidebarOpen(current => !current)}
+              onToggleTheme={() => setTheme(current => current === 'dark' ? 'light' : 'dark')}
+              onLogout={adminLogout}
+            />
           </Suspense>
 
           {toast && (
@@ -1379,55 +1387,29 @@ function AccountPanel({
 
 function AdminHeader({
   navigate,
-  onLogout,
   theme,
-  onToggleTheme,
+  sidebarOpen,
+  onToggleSidebar,
 }) {
   return (
     <header className="admin-topbar">
 
-      <button
-        className="brand"
-        onClick={() =>
-          navigate('admin')
-        }
-        aria-label="EquipTrade India admin home"
-      >
-        <BrandLogo subtitle="ADMIN" />
-      </button>
-
       <div className="admin-topbar-actions">
-
-        <ThemeToggle theme={theme} onToggle={onToggleTheme} />
-
         <span className="admin-context">
           <ShieldCheck size={15} />
           Private verification desk
         </span>
 
         <button
-          className="button button-outline"
-          onClick={onLogout}
+          type="button"
+          className="admin-topbar-toggle"
+          onClick={onToggleSidebar}
+          aria-label={sidebarOpen ? 'Close navigation' : 'Open navigation'}
         >
-          Log out
+          {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
         </button>
-
-        <button
-          className="button button-outline"
-          onClick={() => {
-            window.history.pushState(
-              {},
-              '',
-              '/'
-            )
-            navigate('home')
-          }}
-        >
-          Back to marketplace
-          <ArrowRight size={15} />
-        </button>
-
       </div>
+
     </header>
   )
 }

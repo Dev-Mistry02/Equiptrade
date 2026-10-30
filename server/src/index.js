@@ -1,8 +1,10 @@
 import express from 'express';
 import cors from 'cors';
 import mongoose from 'mongoose';
+import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { Server } from 'socket.io';
 
 import { env, validateSecuritySecrets } from './config/env.js';
 import authRoutes from './routes/auth.routes.js';
@@ -63,6 +65,41 @@ app.use(
 );
 
 app.use(express.json({ limit: '25mb' }));
+
+const httpServer = http.createServer(app);
+
+const io = new Server(httpServer, {
+  cors: {
+    origin(origin, callback) {
+      const allowedOrigins = [
+        env.clientUrl,
+        'https://equiptradeindia.onrender.com',
+        'http://localhost:5173',
+        'https://www.equiptradeindia.com',
+      ].filter(Boolean);
+
+      const isLocal =
+        /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/.test(
+          origin || ''
+        );
+
+      if (!origin || allowedOrigins.includes(origin) || isLocal) {
+        return callback(null, true);
+      }
+
+      return callback(new Error('Origin not allowed by Socket.io CORS'));
+    },
+    credentials: true,
+  },
+  transports: ['websocket', 'polling'],
+});
+
+app.locals.io = io;
+
+io.on('connection', socket => {
+  socket.join('marketplace');
+  socket.on('disconnect', () => {});
+});
 
 app.get('/api/health', (_req, res) => {
   const connected = mongoose.connection.readyState === 1;
@@ -236,7 +273,7 @@ async function startServer() {
 
     const port = env.port || process.env.PORT || 4000;
 
-    app.listen(port, '0.0.0.0', () => {
+    httpServer.listen(port, '0.0.0.0', () => {
       console.log(`EquipTrade server listening on port ${port}`);
     });
   } catch (error) {

@@ -34,10 +34,12 @@ import {
   getCachedProduct,
   setCachedListings,
   setCachedProduct,
+  invalidateAllListings,
 } from '../marketplaceCache'
 import { toProductSlug } from '../productSlug'
 import { isPublicQualityListing } from '../listingQuality'
 import { isListingSaved, toggleSavedListing } from '../savedListings'
+import { subscribeToMarketplace } from '../socket'
 import '../product-detail.css'
 
 export { toProductSlug }
@@ -94,6 +96,23 @@ export default function ProductDetail({
   const [feedbackError, setFeedbackError] = useState('')
   const productRequestVersion = useRef(0)
 
+  const [inspectionNoticeDismissed, setInspectionNoticeDismissed] = useState(() => {
+    try {
+      return localStorage.getItem('equiptrade_inspection_notice') === 'dismissed'
+    } catch {
+      return false
+    }
+  })
+
+  const dismissInspectionNotice = () => {
+    setInspectionNoticeDismissed(true)
+    try {
+      localStorage.setItem('equiptrade_inspection_notice', 'dismissed')
+    } catch {
+      // ignore
+    }
+  }
+
   const [isSaved, setIsSaved] = useState(() =>
     isListingSaved(item?._id || item?.id)
   )
@@ -104,6 +123,23 @@ export default function ProductDetail({
     mobileNumber: user?.mobileNumber || '',
     message: '',
   })
+
+  const [isSold, setIsSold] = useState(
+    Boolean(item?.soldAt || item?.isActive === false)
+  )
+  const [selling, setSelling] = useState(false)
+
+  const sellerId = item?.seller
+    ? typeof item.seller === 'object'
+      ? item.seller._id || item.seller.id
+      : item.seller
+    : null
+
+  const isSeller = Boolean(
+    user && sellerId &&
+      (String(sellerId) === String(user.id) ||
+        String(sellerId) === String(user._id))
+  )
 
   // Synchronize user profile into enquiry form when available
   useEffect(() => {
@@ -126,6 +162,28 @@ export default function ProductDetail({
     return () => {
       window.removeEventListener('equiptrade:saved-listings-changed', syncSavedState)
     }
+  }, [item])
+
+  /*
+   * Socket.io real-time update: if this listing is marked sold from another
+   * tab/device, reflect the sold state immediately without a refresh.
+   */
+  useEffect(() => {
+    if (!item?._id && !item?.id) return
+
+    const unsubscribe = subscribeToMarketplace(update => {
+      const { id } = update || {}
+      if (
+        (update.event === 'equipment:sold' || update.soldAt) &&
+        id &&
+        (String(item._id || item.id) === String(id))
+      ) {
+        setIsSold(true)
+        invalidateAllListings()
+      }
+    })
+
+    return unsubscribe
   }, [item])
 
   useEffect(() => {
@@ -169,16 +227,16 @@ export default function ProductDetail({
       if (requestId !== productRequestVersion.current) return
 
       if (!found) {
-        const data = await api.getEquipment()
+        const data = await api.getEquipment({ page: 1, limit: 24 })
         if (requestId !== productRequestVersion.current) return
-        if (!Array.isArray(data)) {
+        if (!data || !Array.isArray(data.listings)) {
           throw new Error('The marketplace returned an unexpected response.')
         }
 
-        setAllListings(data)
+        setAllListings(data.listings)
         setCachedListings('all', data)
         listingsLoaded = true
-        found = data.find(listing =>
+        found = data.listings.find(listing =>
           isPublicQualityListing(listing) && matchesProductSlug(listing, slug)
         )
       }
@@ -194,14 +252,14 @@ export default function ProductDetail({
 
       if (listingsLoaded) return
 
-      api.getEquipment()
+      api.getEquipment({ page: 1, limit: 24 })
         .then(data => {
           if (requestId !== productRequestVersion.current) return
-          if (!Array.isArray(data)) {
+          if (!data || !Array.isArray(data.listings)) {
             throw new Error('The marketplace returned an unexpected response.')
           }
           setCachedListings('all', data)
-          setAllListings(data)
+          setAllListings(data.listings)
         })
         .catch(error => {
           if (requestId === productRequestVersion.current) {
@@ -241,14 +299,14 @@ export default function ProductDetail({
     } else {
       // Background load other listings for related items
       let active = true
-      api.getEquipment()
+      api.getEquipment({ page: 1, limit: 24 })
         .then(data => {
           if (!active) return
-          if (!Array.isArray(data)) {
+          if (!data || !Array.isArray(data.listings)) {
             throw new Error('The marketplace returned an unexpected response.')
           }
           setCachedListings('all', data)
-          setAllListings(data)
+          setAllListings(data.listings)
         })
         .catch(error => {
           if (active) {
@@ -419,10 +477,30 @@ export default function ProductDetail({
       notify?.('Thank you for rating our services.')
     } catch (error) {
       setFeedbackError(
-        error.message || 'Unable to save your feedback. Please try again.'
+        error.message || 'Unable to save your feedback.'
       )
     } finally {
       setFeedbackSending(false)
+    }
+  }
+
+  const handleMarkSold = async () => {
+    if (!user || !isSeller) return
+
+    const confirmed = window.confirm(
+      'Mark this equipment as sold? This will remove it from the marketplace.'
+    )
+    if (!confirmed) return
+
+    setSelling(true)
+    try {
+      await api.markEquipmentAsSold(item._id || item.id)
+      setIsSold(true)
+      notify?.('Equipment marked as sold.')
+    } catch (error) {
+      notify?.(error.message || 'Unable to mark equipment as sold.')
+    } finally {
+      setSelling(false)
     }
   }
 
@@ -453,6 +531,15 @@ export default function ProductDetail({
           <p style={{ color: 'var(--muted)', fontSize: 13 }}>
             Retrieving verified specifications and photos from EquipTrade network.
           </p>
+          <button
+            type="button"
+            className="button button-dark"
+            style={{ marginTop: 16, display: 'inline-flex', alignItems: 'center', gap: 8 }}
+            onClick={loadProduct}
+          >
+            <ArrowRight size={16} />
+            Try again
+          </button>
         </div>
       </main>
     )
@@ -568,6 +655,19 @@ export default function ProductDetail({
             {isSaved ? 'Saved' : 'Save'}
           </button>
         </div>
+
+        {isSold && (
+          <div className="pd-sold-state">
+            <span className="pd-sold-badge">
+              <CheckCircle2 size={14} />
+              Sold
+            </span>
+            <p style={{ margin: '6px 0 0', fontSize: 13 }}>
+              This equipment has been marked as sold and is no longer visible
+              to buyers.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* ---------------- MAIN PRODUCT GRID ---------------- */}
@@ -747,6 +847,23 @@ export default function ProductDetail({
               I’m Interested · Enquire Now
               <ArrowRight size={17} />
             </button>
+
+            {isSeller && !isSold && (
+              <button
+                type="button"
+                className="pd-action-btn pd-action-btn-sold"
+                onClick={handleMarkSold}
+                disabled={selling}
+                title="Mark as sold"
+              >
+                {selling ? (
+                  <LoaderCircle className="action-spinner" size={15} />
+                ) : (
+                  <CheckCircle2 size={15} />
+                )}
+                {selling ? 'Marking...' : 'Mark as Sold'}
+              </button>
+            )}
 
             <button
               type="button"
@@ -1234,6 +1351,26 @@ export default function ProductDetail({
           </div>
         </div>
       )}
+    {!inspectionNoticeDismissed && (
+      <div className="pd-inspection-notice" role="region" aria-label="Buyer inspection notice">
+        <div className="pd-inspection-notice-content">
+          <span className="pd-inspection-notice-icon">⚠</span>
+          <p className="pd-inspection-notice-text">
+            Buyers are strongly advised to personally inspect and verify the
+            equipment, its condition, quality, and functionality before making
+            any purchase.
+          </p>
+          <button
+            type="button"
+            className="pd-inspection-notice-close"
+            onClick={dismissInspectionNotice}
+            aria-label="Dismiss notice"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      </div>
+    )}
     </main>
   )
 }

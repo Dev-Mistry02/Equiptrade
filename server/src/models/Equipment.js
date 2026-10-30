@@ -41,7 +41,9 @@ const equipmentSchema = new mongoose.Schema({
   isQualityReviewed: { type: Boolean, default: false },
   qualityReviewReason: { type: String, trim: true },
   status: { type: String, enum: ['pending', 'under_review', 'approved', 'rejected', 'changes_required', 'published'], default: 'pending' },
-  verificationStatus: { type: String, default: 'Pending Verification' }
+  verificationStatus: { type: String, default: 'Pending Verification' },
+  isActive: { type: Boolean, default: true },
+  soldAt: { type: Date },
 }, { timestamps: true })
 
 equipmentSchema.index({ status: 1, category: 1, createdAt: -1 })
@@ -50,5 +52,6 @@ equipmentSchema.index({ status: 1, condition: 1, createdAt: -1 })
 equipmentSchema.index({ status: 1, price: 1, createdAt: -1 })
 equipmentSchema.index({ seller: 1, createdAt: -1 })
 equipmentSchema.index({ status: 1, createdAt: -1 })
+equipmentSchema.index({ name: 'text', description: 'text', brand: 'text', model: 'text', oemPartNumber: 'text' })
 
 export default mongoose.model('Equipment', equipmentSchema)

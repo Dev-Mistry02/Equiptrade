@@ -12,7 +12,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import { EquipmentCard } from '../components/MarketplaceComponents'
 import { categories, inventoryConditions } from '../data'
-import { getCachedListings, setCachedListings } from '../marketplaceCache'
+import { getCachedListings, setCachedListings, deleteCachedListings } from '../marketplaceCache'
+import { subscribeToMarketplace } from '../socket'
 import { isPublicQualityListing } from '../listingQuality'
 import { toProductSlug } from '../productSlug'
 
@@ -38,13 +39,20 @@ export default function Browse({
     location: '',
     minPrice: '',
     maxPrice: '',
+    page: 1,
+    limit: 24,
     ...initialFilters,
   }))
   const [sort, setSort] = useState(initialFilters?.sort || 'newest')
+  const [totalPages, setTotalPages] = useState(0)
+  const [totalListings, setTotalListings] = useState(0)
 
-  const browseCacheKey = getBrowseCacheKey(search, { ...filters, sort })
+  const browseCacheKey = getBrowseCacheKey(search, { ...filters, sort, page: filters.page })
   const [equipment, setEquipment] = useState(
-    () => getCachedListings(browseCacheKey) || []
+    () => {
+      const cached = getCachedListings(browseCacheKey)
+      return cached && Array.isArray(cached.listings) ? cached.listings : []
+    }
   )
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(
@@ -64,6 +72,8 @@ export default function Browse({
       location: initialFilters.location || '',
       minPrice: initialFilters.minPrice || '',
       maxPrice: initialFilters.maxPrice || '',
+      page: initialFilters.page || 1,
+      limit: initialFilters.limit || 24,
     })
     setSort(initialFilters.sort || 'newest')
   }, [initialFilters])
@@ -73,8 +83,9 @@ export default function Browse({
     const params = new URLSearchParams()
     if (search.trim()) params.set('search', search.trim().replace(/\s+/g, ' '))
     Object.entries(filters).forEach(([key, value]) => {
-      if (value) params.set(key, value)
+      if (value && key !== 'page' && key !== 'limit') params.set(key, value)
     })
+    if (filters.page > 1) params.set('page', String(filters.page))
     if (sort !== 'newest') params.set('sort', sort)
     const query = params.toString()
     window.history.replaceState(
@@ -110,7 +121,7 @@ export default function Browse({
    */
   const fetchEquipment = useCallback(async ({ showLoading = true } = {}) => {
     const requestId = ++requestVersion.current
-    const cacheKey = getBrowseCacheKey(search, { ...filters, sort })
+    const cacheKey = getBrowseCacheKey(search, { ...filters, sort, page: filters.page })
     const hasCachedListings = Boolean(getCachedListings(cacheKey))
     activeRequest.current?.abort()
 
@@ -131,9 +142,11 @@ export default function Browse({
 
       if (requestId !== requestVersion.current) return
 
-      if (Array.isArray(data)) {
+      if (data && Array.isArray(data.listings)) {
         setCachedListings(cacheKey, data)
-        setEquipment(data)
+        setEquipment(data.listings)
+        setTotalPages(data.pages || 0)
+        setTotalListings(data.total || 0)
       } else {
         throw new Error('The marketplace returned an unexpected response.')
       }
@@ -189,6 +202,54 @@ export default function Browse({
     }
   }, [fetchEquipment])
 
+  /*
+   * Keep totals in sync when the socket mutates the local list.
+   */
+  const invalidateTotal = () => {
+    setTotalListings(prev => Math.max(0, prev - 1))
+    setTotalPages(prev => Math.max(0, prev - 1))
+  }
+
+  /*
+   * Socket.io real-time updates: remove sold items and add new listings
+   * instantly without waiting for a manual refresh.
+   */
+  useEffect(() => {
+    if (window.location.pathname !== '/buy') return
+
+    const unsubscribe = subscribeToMarketplace(update => {
+      const { id } = update || {}
+
+      if (update.event === 'equipment:sold' || update.soldAt) {
+        // A listing was marked sold: drop it from results + clear cache
+        setEquipment(current =>
+          current.filter(item => String(item._id || item.id) !== String(id))
+        )
+        deleteCachedListings(
+          getBrowseCacheKey(search, { ...filters, sort, page: filters.page })
+        )
+        invalidateTotal()
+        return
+      }
+
+      // A new listing was created: prepend it to results
+      if (update.id && update.name) {
+        setEquipment(current => {
+          const exists = current.some(
+            item => String(item._id || item.id) === String(update.id)
+          )
+          if (exists) return current
+          return [update, ...current].slice(0, 24)
+        })
+        deleteCachedListings(
+          getBrowseCacheKey(search, { ...filters, sort, page: filters.page })
+        )
+      }
+    })
+
+    return unsubscribe
+  }, [search, filters, sort])
+
   const filtered = equipment.filter(isPublicQualityListing)
 
   /*
@@ -215,6 +276,8 @@ export default function Browse({
       location: '',
       minPrice: '',
       maxPrice: '',
+      page: 1,
+      limit: 24,
     })
   }
 
@@ -567,10 +630,16 @@ export default function Browse({
 
                 <span>
                   <strong>
-                    {loading ? '—' : filtered.length}
+                    {loading ? '—' : totalListings}
                   </strong>{' '}
                   {loading ? 'loading listings' : 'matching listings'}
                 </span>
+
+                {totalPages > 1 && (
+                  <span className="page-info">
+                    Page {filters.page} of {totalPages}
+                  </span>
+                )}
 
                 <span className="view-toggle">
                   ▦ &nbsp; <span>☷</span>
@@ -648,6 +717,31 @@ export default function Browse({
                     </button>
                   </div>
                 </section>
+              )}
+
+              {/* PAGINATION */}
+              {totalPages > 1 && !loading && (
+                <div className="pagination-controls">
+                  <button
+                    type="button"
+                    className="pagination-button"
+                    disabled={filters.page <= 1}
+                    onClick={() => setFilters(current => ({ ...current, page: current.page - 1 }))}
+                  >
+                    ← Previous
+                  </button>
+                  <span className="pagination-page">
+                    {filters.page} of {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    className="pagination-button"
+                    disabled={filters.page >= totalPages}
+                    onClick={() => setFilters(current => ({ ...current, page: current.page + 1 }))}
+                  >
+                    Next →
+                  </button>
+                </div>
               )}
 
             </>

@@ -76,6 +76,27 @@ export function setCachedListings(key, listings) {
   }
 }
 
+export function deleteCachedListings(key = 'all') {
+  listingCache.delete(key)
+
+  if (key === 'home') {
+    try {
+      localStorage.removeItem(HOME_CACHE_KEY)
+    } catch {
+      // ignore
+    }
+  }
+}
+
+export function invalidateAllListings() {
+  listingCache.clear()
+  try {
+    localStorage.removeItem(HOME_CACHE_KEY)
+  } catch {
+    // ignore
+  }
+}
+
 export function getCachedProduct(slug) {
   return readCache(productCache, slug)
 }

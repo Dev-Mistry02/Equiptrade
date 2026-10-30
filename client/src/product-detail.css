@@ -93,6 +93,57 @@
   background: #fdf3f3;
 }
 
+.pd-action-btn.pd-action-btn-sold {
+  color: #277258;
+  border-color: #b9e3d0;
+  background: #edf7f2;
+}
+
+.pd-action-btn.pd-action-btn-sold:hover:not(:disabled) {
+  border-color: #277258;
+  background: #dcede3;
+  color: #1d5a4d;
+}
+
+.pd-action-btn.pd-action-btn-sold:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.pd-sold-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  background: #277258;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+.pd-sold-badge svg {
+  flex: none;
+}
+
+/* Sold state banner */
+.pd-sold-state {
+  margin-top: 14px;
+  padding: 16px;
+  background: #edf7f2;
+  border: 1px solid #b9e3d0;
+  border-radius: 10px;
+  color: #277258;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.pd-sold-state strong {
+  font-size: 15px;
+}
+
 /* ---------------- Main Layout ---------------- */
 .pd-main-grid {
   display: grid;
@@ -100,6 +151,9 @@
   gap: 36px;
   align-items: start;
   margin-bottom: 48px;
+}
+.pd-main-grid > * {
+  min-width: 0;
 }
 
 /* ---------------- Left Gallery ---------------- */
@@ -1379,4 +1433,72 @@
   color: var(--muted);
   line-height: 1.6;
   margin-bottom: 28px;
+}
+
+/* ---------------- Buyer Inspection Notice ---------------- */
+.pd-inspection-notice {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 110;
+  background: #fff3cd;
+  border-top: 2px solid #b58900;
+  color: #5c4a00;
+  font-size: 13px;
+  line-height: 1.5;
+  box-shadow: 0 -4px 12px rgba(16, 42, 67, .08);
+}
+
+.pd-inspection-notice-content {
+  max-width: min(1180px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.pd-inspection-notice-icon {
+  flex: none;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.pd-inspection-notice-text {
+  flex: 1;
+  margin: 0;
+  font-size: 13px;
+  color: #5c4a00;
+}
+
+.pd-inspection-notice-close {
+  flex: none;
+  background: transparent;
+  border: 1px solid #b58900;
+  border-radius: 4px;
+  color: #5c4a00;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.pd-inspection-notice-close:hover {
+  background: #f2e2a3;
+}
+
+@media (max-width: 700px) {
+  .pd-inspection-notice-content {
+    padding: 10px 16px;
+    gap: 10px;
+  }
+
+  .pd-inspection-notice-text {
+    font-size: 12px;
+  }
+
+  .pd-inspection-notice-close {
+    padding: 3px 6px;
+    font-size: 11px;
+  }
 }

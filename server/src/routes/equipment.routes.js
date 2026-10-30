@@ -307,10 +307,20 @@ router.get('/', async (req, res) => {
       : sortOption === 'price-desc'
         ? { price: -1, createdAt: -1 }
         : { createdAt: -1 }
-    let listings = await Equipment.find(query)
-      .sort(sort)
-      .populate('seller', 'name verified')
-      .lean()
+
+    const page = Math.max(1, parseInt(String(req.query.page || '1'), 10))
+    const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit || '24'), 10)))
+    const skip = (page - 1) * limit
+
+    const [listings, total] = await Promise.all([
+      Equipment.find(query)
+        .sort(sort)
+        .populate('seller', 'name verified')
+        .lean()
+        .skip(skip)
+        .limit(limit),
+      Equipment.countDocuments(query),
+    ])
 
     if (sortOption.startsWith('price-')) {
       const direction = sortOption === 'price-asc' ? 1 : -1
@@ -325,7 +335,14 @@ router.get('/', async (req, res) => {
       })
     }
 
-    res.json(listings)
+    res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=120')
+    return res.json({
+      listings,
+      total,
+      page,
+      pages: Math.ceil(total / limit),
+      limit,
+    })
   } catch (error) {
     res.status(500).json({
       message: error.message,
@@ -437,16 +454,30 @@ router.get('/:idOrSlug', async (req, res) => {
       item = await Equipment.findOne({
         _id: idOrSlug,
         ...PUBLIC_LISTING_FILTER,
-      }).populate('seller', 'name verified')
+      }).populate('seller', 'name verified').lean()
     }
 
     if (!item) {
-      const all = await Equipment.find({
-        ...PUBLIC_LISTING_FILTER,
-      }).populate('seller', 'name verified')
-
       const target = decodeURIComponent(idOrSlug).toLowerCase().trim()
-      item = all.find(e => {
+      const nameRegex = new RegExp(target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
+
+      item = await Equipment.findOne({
+        ...PUBLIC_LISTING_FILTER,
+        name: nameRegex,
+      }).populate('seller', 'name verified').lean()
+    }
+
+    if (!item) {
+      const targetSlug = decodeURIComponent(idOrSlug).toLowerCase().trim()
+        .replace(/[^\w\s-]/g, '')
+        .replace(/[\s_-]+/g, '-')
+
+      const candidates = await Equipment.find({
+        ...PUBLIC_LISTING_FILTER,
+        name: { $regex: new RegExp(decodeURIComponent(idOrSlug).replace(/[.*+?^${}()|[\]\\]/g, ch => '\\' + ch), 'i') },
+      }).populate('seller', 'name verified').lean().limit(50)
+
+      item = candidates.find(e => {
         const slug = (e.name || '')
           .toLowerCase()
           .trim()
@@ -454,9 +485,9 @@ router.get('/:idOrSlug', async (req, res) => {
           .replace(/[\s_-]+/g, '-')
         const raw = (e.name || '').toLowerCase().trim()
         return (
-          slug === target ||
-          raw === target ||
-          raw.replace(/\s+/g, '-') === target
+          slug === targetSlug ||
+          raw === targetSlug ||
+          raw.replace(/\s+/g, '-') === targetSlug
         )
       })
     }
@@ -467,7 +498,8 @@ router.get('/:idOrSlug', async (req, res) => {
       })
     }
 
-    res.json(item)
+    res.set('Cache-Control', 'public, max-age=120, stale-while-revalidate=300')
+    return res.json(item)
   } catch (error) {
     res.status(500).json({
       message: error.message,
@@ -548,6 +580,22 @@ router.post('/', requireUser, async (req, res) => {
       }
     }
 
+    try {
+      const io = req.app.locals.io
+      if (io) {
+        io.to('marketplace').emit('equipment:created', {
+          id: listing._id,
+          name: listing.name,
+          category: listing.category,
+          price: listing.price,
+          location: listing.location,
+          images: listing.images,
+        })
+      }
+    } catch (emitError) {
+      console.error('Socket.io emit failed (equipment:created):', emitError.message)
+    }
+
     res.status(201).json({
       ...listing.toObject(),
       emailSent,
@@ -555,6 +603,67 @@ router.post('/', requireUser, async (req, res) => {
   } catch (error) {
     res.status(400).json({
       message: error.message,
+    })
+  }
+})
+
+router.patch('/:id/sold', requireUser, async (req, res) => {
+  try {
+    const { id } = req.params
+
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ message: 'Invalid listing id.' })
+    }
+
+    const sellerId = req.user.userId || req.user.id
+
+    const listing = await Equipment.findOne({
+      _id: id,
+      seller: sellerId,
+      isActive: true,
+    }).lean()
+
+    if (!listing) {
+      return res.status(404).json({
+        message: 'Active listing not found or you are not the seller.',
+      })
+    }
+
+    const updated = await Equipment.findByIdAndUpdate(
+      id,
+      {
+        $set: {
+          isActive: false,
+          soldAt: new Date(),
+        },
+      },
+      { new: true, runValidators: true }
+    ).lean()
+
+    if (!updated) {
+      return res.status(404).json({ message: 'Equipment listing not found.' })
+    }
+
+    try {
+      const io = req.app.locals.io
+      if (io) {
+        io.to('marketplace').emit('equipment:sold', {
+          id,
+          soldAt: new Date(),
+        })
+      }
+    } catch (emitError) {
+      console.error('Socket.io emit failed (equipment:sold):', emitError.message)
+    }
+
+    return res.json({
+      ...updated,
+      sold: true,
+    })
+  } catch (error) {
+    console.error('Failed to mark equipment as sold:', error)
+    return res.status(500).json({
+      message: 'Unable to mark equipment as sold. Please try again.',
     })
   }
 })

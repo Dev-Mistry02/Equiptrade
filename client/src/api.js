@@ -88,12 +88,23 @@ async function request(path, options = {}) {
       ...(fetchOptions.headers || {}),
     }
 
+    let signal = fetchOptions.signal
+    if (!signal) {
+      if (typeof AbortSignal.timeout === 'function') {
+        signal = AbortSignal.timeout(timeoutMs)
+      } else {
+        const controller = new AbortController()
+        setTimeout(() => controller.abort(), timeoutMs)
+        signal = controller.signal
+      }
+    }
+
     response = await fetch(`${API_URL}${path}`, {
       ...fetchOptions,
       headers,
       credentials: 'include',
       cache: isGetRequest ? 'default' : 'no-store',
-      signal: fetchOptions.signal || AbortSignal.timeout(timeoutMs),
+      signal,
     })
   } catch (error) {
     if (error.name === 'TimeoutError' || error.name === 'AbortError') {
@@ -338,6 +349,12 @@ export const api = {
     request(`/equipment/${encodeURIComponent(id)}/enquiries`, {
       method: 'POST',
       body: JSON.stringify(payload),
+    }),
+
+  markEquipmentAsSold: id =>
+    request(`/equipment/${encodeURIComponent(id)}/sold`, {
+      method: 'PATCH',
+      body: JSON.stringify({}),
     }),
 
   submitServiceFeedback: payload =>
